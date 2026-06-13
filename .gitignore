@@ -7,3 +7,7 @@
 *.db-journal
 /collector/*.db-shm
 /collector/*.db
+
+/agents
+.superpowers
+docs/

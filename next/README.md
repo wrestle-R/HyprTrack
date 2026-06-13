@@ -1,21 +1,43 @@
-# Next.js template
+# HyprTrack Dashboard
 
-This is a Next.js template with shadcn/ui.
+A local-first Next.js dashboard for the HyprTrack SQLite activity database.
+The web app is read-only: the Python collector remains the only database
+writer.
 
-## Adding components
+## Run
 
-To add components to your app, run the following command:
+From this directory:
 
 ```bash
-npx shadcn@latest add button
+npm install
+npm run dev
 ```
 
-This will place the ui components in the `components` directory.
+Open `http://localhost:3000`.
 
-## Using components
+The default database is `../collector/hyprtrack.db`. Override it when needed:
 
-To use the components in your app, import them as follows:
+```bash
+HYPRTRACK_DB_PATH=/absolute/path/to/hyprtrack.db npm run dev
+```
 
-```tsx
-import { Button } from "@/components/ui/button";
+## Data Boundary
+
+Dashboard queries select only:
+
+- `sampled_at`
+- `app_class`
+- `window_title`
+
+Durations are estimates: each sample contributes one minute. Matching
+consecutive samples are grouped into sessions, and gaps over 90 seconds split a
+session.
+
+## Checks
+
+```bash
+npm test
+npm run lint
+npm run typecheck
+npm run build
 ```
