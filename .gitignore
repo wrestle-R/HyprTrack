@@ -1,9 +1,9 @@
+/__pycache__/
+*.py[cod]
+
+/collector/__pycache__/
+/collector/hyprtrack.db
 *.db
 *.db-journal
-*.db-shm
-*.db-wal
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-.worktrees/
+/collector/*.db-shm
+/collector/*.db
