@@ -29,10 +29,14 @@ python3 hyprtrack.py --db /path/to/activity.db
 ```
 
 The default database is `./hyprtrack.db`. Timestamps use IST (`+05:30`). Zen
-Browser titles are reduced to their service name, such as `YouTube`, `Claude`,
-or `ChatGPT`. Other windows store only the application name, such as `VS Code`.
-A missing active window or a `hyprctl` error is printed to stderr and creates
-no activity row.
+and Brave titles are reduced to service names such as `YouTube`, `Claude`,
+`ChatGPT`, `WhatsApp`, `GitHub`, `LeetCode`, and `Vercel`. Other windows store
+only the application name, such as `VS Code` or `Terminal`. Known personal
+sites are grouped under `Personal Websites`. A missing active window or a
+`hyprctl` error is printed to stderr and creates no activity row.
+
+Each row also includes `window_full`, containing the original unmodified
+Hyprland title.
 
 Stop continuous tracking with `Ctrl+C`.
 
@@ -42,7 +46,7 @@ Using the SQLite command-line client:
 
 ```bash
 sqlite3 hyprtrack.db \
-  "SELECT sampled_at, app_class, window_title FROM activity_samples ORDER BY sampled_at DESC LIMIT 20;"
+  "SELECT sampled_at, app_class, window_title, window_full FROM activity_samples ORDER BY sampled_at DESC LIMIT 20;"
 ```
 
 Summarize the number of samples by application:

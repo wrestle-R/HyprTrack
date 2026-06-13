@@ -3,6 +3,7 @@
 import argparse
 import contextlib
 import json
+import re
 import sqlite3
 import subprocess
 import sys
@@ -19,6 +20,31 @@ APP_LABELS = {
     "code": "VS Code",
     "code-oss": "VS Code",
     "visual studio code": "VS Code",
+    "kitty": "Terminal",
+}
+ZEN_SERVICES = {
+    "chatgpt": "ChatGPT",
+    "claude": "Claude",
+    "github": "GitHub",
+    "leetcode": "LeetCode",
+    "vercel": "Vercel",
+    "whatsapp": "WhatsApp",
+    "youtube": "YouTube",
+}
+GITHUB_REPOSITORY_TITLE = re.compile(
+    r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+)
+PERSONAL_WEBSITE_TITLES = {
+    "home | blogs",
+    "running out of excuses",
+    "russel daniel paul",
+}
+BROWSER_SUFFIXES = {
+    "zen": (" — Zen Browser",),
+    "brave": (" - Brave",),
+    "brave-browser": (" - Brave",),
+    "brave-origin": (" - Brave Origin",),
+    "brave-origin-nightly": (" - Brave Origin",),
 }
 
 
@@ -30,10 +56,22 @@ def initialize_database(db_path: Path) -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 sampled_at TEXT NOT NULL,
                 app_class TEXT NOT NULL,
-                window_title TEXT NOT NULL
+                window_title TEXT NOT NULL,
+                window_full TEXT NOT NULL
             )
             """
         )
+        columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info(activity_samples)"
+            )
+        }
+        if "window_full" not in columns:
+            connection.execute(
+                "ALTER TABLE activity_samples "
+                "ADD COLUMN window_full TEXT NOT NULL DEFAULT ''"
+            )
         connection.commit()
 
 
@@ -84,18 +122,36 @@ def get_active_window() -> tuple[str, str] | None:
 
 def normalize_window_title(app_class: str, window_title: str) -> str:
     normalized_class = app_class.strip()
-    if normalized_class.casefold() != "zen":
+    class_key = normalized_class.casefold()
+    if class_key not in BROWSER_SUFFIXES:
         return APP_LABELS.get(
-            normalized_class.casefold(),
+            class_key,
             normalized_class,
         )
 
-    title_without_browser = window_title.rsplit(" — ", 1)[0].strip()
-    if " - " not in title_without_browser:
-        return "Zen"
+    title_without_browser = window_title.strip()
+    for suffix in BROWSER_SUFFIXES[class_key]:
+        if title_without_browser.endswith(suffix):
+            title_without_browser = title_without_browser[: -len(suffix)].strip()
+            break
 
-    service = title_without_browser.rsplit(" - ", 1)[1].strip()
-    return service or "Zen"
+    folded_title = title_without_browser.casefold()
+    if folded_title in PERSONAL_WEBSITE_TITLES:
+        return "Personal Websites"
+
+    for marker, label in ZEN_SERVICES.items():
+        if marker in folded_title:
+            return label
+
+    if GITHUB_REPOSITORY_TITLE.fullmatch(title_without_browser):
+        return "GitHub"
+
+    if " - " in title_without_browser:
+        service = title_without_browser.rsplit(" - ", 1)[1].strip()
+        if service:
+            return service
+
+    return title_without_browser or "Zen"
 
 
 def record_sample(db_path: Path) -> bool:
@@ -104,17 +160,22 @@ def record_sample(db_path: Path) -> bool:
     if active_window is None:
         return False
 
-    app_class, window_title = active_window
-    window_title = normalize_window_title(app_class, window_title)
+    app_class, window_full = active_window
+    window_title = normalize_window_title(app_class, window_full)
     sampled_at = datetime.now(IST).isoformat(timespec="seconds")
 
     with contextlib.closing(sqlite3.connect(db_path)) as connection:
         connection.execute(
             """
-            INSERT INTO activity_samples (sampled_at, app_class, window_title)
-            VALUES (?, ?, ?)
+            INSERT INTO activity_samples (
+                sampled_at,
+                app_class,
+                window_title,
+                window_full
+            )
+            VALUES (?, ?, ?, ?)
             """,
-            (sampled_at, app_class, window_title),
+            (sampled_at, app_class, window_title, window_full),
         )
         connection.commit()
 
