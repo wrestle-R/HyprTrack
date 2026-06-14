@@ -1,10 +1,6 @@
 "use client"
 
-import {
-  Database01Icon,
-  Moon02Icon,
-  Sun03Icon,
-} from "@hugeicons/core-free-icons"
+import { Moon02Icon, Sun03Icon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { useTheme } from "next-themes"
 
@@ -14,7 +10,6 @@ import {
   DashboardSkeleton,
 } from "@/components/dashboard/data-state"
 import { PageHeading } from "@/components/dashboard/page-heading"
-import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
@@ -25,30 +20,17 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useDashboardQuery } from "@/hooks/use-dashboard-query"
-import { formatTimestamp } from "@/lib/dashboard/format"
-import type {
-  ApplicationsData,
-  HealthData,
-  RangeKey,
-} from "@/lib/dashboard/types"
+import type { ApplicationsData, RangeKey } from "@/lib/dashboard/types"
 
 export function SettingsPage() {
   const { setTheme } = useTheme()
-  const {
-    preferences,
-    updatePreferences,
-    setRange,
-  } = useDashboard()
-  const health = useDashboardQuery<HealthData>("/api/health")
+  const { preferences, updatePreferences, setRange } = useDashboard()
   const applications = useDashboardQuery<ApplicationsData>(
     "/api/applications?range=30d"
   )
 
-  if (health.isLoading || applications.isLoading) {
+  if (applications.isLoading) {
     return <DashboardSkeleton />
-  }
-  if (health.error) {
-    return <DashboardError message={health.error} />
   }
 
   const availableTitles = applications.data?.items.map(
@@ -129,66 +111,6 @@ export function SettingsPage() {
               <ToggleGroupItem value="7d">7 days</ToggleGroupItem>
               <ToggleGroupItem value="30d">30 days</ToggleGroupItem>
             </ToggleGroup>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-none">
-          <CardHeader>
-            <CardTitle>Table density</CardTitle>
-            <CardDescription>
-              Control how much activity fits on screen.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ToggleGroup
-              value={[preferences.tableDensity]}
-              onValueChange={(values) => {
-                const density = values[0] as
-                  | "compact"
-                  | "comfortable"
-                  | undefined
-                if (density) {
-                  updatePreferences({ tableDensity: density })
-                }
-              }}
-              variant="outline"
-              spacing={0}
-              aria-label="Table density"
-            >
-              <ToggleGroupItem value="comfortable">
-                Comfortable
-              </ToggleGroupItem>
-              <ToggleGroupItem value="compact">Compact</ToggleGroupItem>
-            </ToggleGroup>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-none">
-          <CardHeader>
-            <CardTitle>Database health</CardTitle>
-            <CardDescription>
-              The dashboard has read-only access to local activity data.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex items-center gap-4">
-            <span className="flex size-10 items-center justify-center rounded-lg bg-muted">
-              <HugeiconsIcon icon={Database01Icon} strokeWidth={1.8} />
-            </span>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="font-medium">SQLite connected</p>
-                <Badge variant="secondary">Read only</Badge>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {health.data?.sampleCount ?? 0} activity records
-                {health.data?.latestSampleAt
-                  ? ` · latest ${formatTimestamp(
-                      health.data.latestSampleAt,
-                      true
-                    )}`
-                  : ""}
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>

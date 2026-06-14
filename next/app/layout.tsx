@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { Geist_Mono, Outfit } from "next/font/google"
+import { JetBrains_Mono, Merriweather, Outfit } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -12,13 +12,21 @@ const fontSans = Outfit({
   variable: "--font-sans",
 })
 
-const fontMono = Geist_Mono({
+const fontSerif = Merriweather({
+  subsets: ["latin"],
+  variable: "--font-serif",
+})
+
+const fontMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 })
 
 export const metadata: Metadata = {
-  title: "HyprTrack",
+  title: {
+    default: "HyprTrack",
+    template: "%s | HyprTrack",
+  },
   description: "Private, local-first activity analytics for Hyprland.",
 }
 
@@ -34,6 +42,7 @@ export default function RootLayout({
       className={cn(
         "font-sans antialiased",
         fontSans.variable,
+        fontSerif.variable,
         fontMono.variable
       )}
     >

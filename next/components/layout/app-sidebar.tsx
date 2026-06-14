@@ -5,6 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
+import { HyprTrackMark } from "@/components/brand/hyprtrack-mark"
 import { NAVIGATION, isNavActive } from "@/components/layout/nav-config"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -35,9 +36,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="gap-0 border-b p-3">
         <Link href="/" className="flex min-w-0 items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-sm font-semibold text-background">
-            H
-          </span>
+          <HyprTrackMark className="size-8 shrink-0 drop-shadow-sm" />
           <span className="min-w-0 group-data-[collapsible=icon]:hidden">
             <span className="block truncate text-sm font-semibold tracking-tight">
               HyprTrack
