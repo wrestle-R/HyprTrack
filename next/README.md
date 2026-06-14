@@ -26,12 +26,15 @@ HYPRTRACK_DB_PATH=/absolute/path/to/hyprtrack.db npm run dev
 Dashboard queries select only:
 
 - `sampled_at`
+- `ended_at`
+- `last_seen_at`
 - `app_class`
 - `window_title`
 
-Durations are estimates: each sample contributes one minute. Matching
-consecutive samples are grouped into sessions, and gaps over 90 seconds split a
-session.
+Durations come from completed activity intervals. Open intervals are counted
+only through their latest checkpoint, and intervals are clipped to the selected
+date range. Legacy rows without interval fields continue to contribute one
+minute. Full browser titles remain private to the collector database.
 
 ## Checks
 

@@ -180,7 +180,7 @@ export function SettingsPage() {
                 <Badge variant="secondary">Read only</Badge>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {health.data?.sampleCount ?? 0} samples
+                {health.data?.sampleCount ?? 0} activity records
                 {health.data?.latestSampleAt
                   ? ` · latest ${formatTimestamp(
                       health.data.latestSampleAt,

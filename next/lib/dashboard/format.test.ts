@@ -9,6 +9,8 @@ import {
 describe("dashboard formatting", () => {
   it("formats minute estimates compactly", () => {
     expect(formatDuration(0)).toBe("0m")
+    expect(formatDuration(0.5)).toBe("30s")
+    expect(formatDuration(1.5)).toBe("1m 30s")
     expect(formatDuration(59)).toBe("59m")
     expect(formatDuration(125)).toBe("2h 5m")
   })

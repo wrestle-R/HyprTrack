@@ -1,11 +1,20 @@
 export function formatDuration(minutes: number) {
-  if (minutes < 60) {
-    return `${minutes}m`
+  const totalSeconds = Math.max(0, Math.round(minutes * 60))
+  if (totalSeconds === 0) {
+    return "0m"
   }
 
-  const hours = Math.floor(minutes / 60)
-  const remainder = minutes % 60
-  return remainder === 0 ? `${hours}h` : `${hours}h ${remainder}m`
+  const hours = Math.floor(totalSeconds / 3600)
+  const remainingSeconds = totalSeconds % 3600
+  const wholeMinutes = Math.floor(remainingSeconds / 60)
+  const seconds = remainingSeconds % 60
+  const parts = [
+    hours > 0 ? `${hours}h` : "",
+    wholeMinutes > 0 ? `${wholeMinutes}m` : "",
+    seconds > 0 ? `${seconds}s` : "",
+  ].filter(Boolean)
+
+  return parts.join(" ")
 }
 
 export function formatTimestamp(value: string, includeDate = false) {

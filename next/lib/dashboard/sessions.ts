@@ -6,16 +6,31 @@ import type {
 const MAX_SESSION_GAP_MS = 90_000
 const SAMPLE_DURATION_MS = 60_000
 
+function sampleEndAt(sample: ActivitySample) {
+  return (
+    sample.endedAt ??
+    formatLikeSample(
+      new Date(new Date(sample.sampledAt).getTime() + SAMPLE_DURATION_MS),
+      sample.sampledAt
+    )
+  )
+}
+
+function durationMinutes(sample: ActivitySample) {
+  return (
+    (new Date(sampleEndAt(sample)).getTime() -
+      new Date(sample.sampledAt).getTime()) /
+    SAMPLE_DURATION_MS
+  )
+}
+
 function toSession(sample: ActivitySample): ActivitySession {
   return {
     startAt: sample.sampledAt,
-    endAt: formatLikeSample(
-      new Date(new Date(sample.sampledAt).getTime() + SAMPLE_DURATION_MS),
-      sample.sampledAt
-    ),
+    endAt: sampleEndAt(sample),
     appClass: sample.appClass,
     windowTitle: sample.windowTitle,
-    durationMinutes: 1,
+    durationMinutes: durationMinutes(sample),
     sampleCount: 1,
   }
 }
@@ -43,7 +58,11 @@ export function groupSessions(samples: ActivitySample[]): ActivitySession[] {
     const currentSession = sessions.at(-1)
     const gap = previousSample
       ? new Date(sample.sampledAt).getTime() -
-        new Date(previousSample.sampledAt).getTime()
+        new Date(
+          previousSample.endedAt
+            ? sampleEndAt(previousSample)
+            : previousSample.sampledAt
+        ).getTime()
       : Number.POSITIVE_INFINITY
     const isContinuation =
       currentSession &&
@@ -59,11 +78,14 @@ export function groupSessions(samples: ActivitySample[]): ActivitySession[] {
     }
 
     currentSession.sampleCount += 1
-    currentSession.durationMinutes += 1
-    currentSession.endAt = formatLikeSample(
-      new Date(new Date(sample.sampledAt).getTime() + SAMPLE_DURATION_MS),
-      sample.sampledAt
-    )
+    currentSession.durationMinutes += durationMinutes(sample)
+    const nextEndAt = sampleEndAt(sample)
+    if (
+      new Date(nextEndAt).getTime() >
+      new Date(currentSession.endAt).getTime()
+    ) {
+      currentSession.endAt = nextEndAt
+    }
     previousSample = sample
   }
 

@@ -123,7 +123,7 @@ export function OverviewPage() {
           icon={Clock01Icon}
           label="Tracked time"
           value={formatDuration(query.data.trackedMinutes)}
-          detail={`${query.data.trackedMinutes} one-minute samples`}
+          detail="Measured from completed activity intervals"
         />
         <Metric
           icon={Activity01Icon}
@@ -149,7 +149,7 @@ export function OverviewPage() {
           value={`${query.data.streakDays} ${
             query.data.streakDays === 1 ? "day" : "days"
           }`}
-          detail="Consecutive days with samples"
+          detail="Consecutive days with tracked activity"
         />
       </section>
 
@@ -195,7 +195,7 @@ export function OverviewPage() {
               }
             />
             <YAxis
-              allowDecimals={false}
+              allowDecimals
               tickLine={false}
               axisLine={false}
               width={34}
@@ -220,7 +220,7 @@ export function OverviewPage() {
           <CardHeader>
             <CardTitle>Application usage</CardTitle>
             <CardDescription>
-              Ranked by estimated tracked minutes.
+              Ranked by tracked duration.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
@@ -260,7 +260,7 @@ export function OverviewPage() {
           <CardHeader>
             <CardTitle>Recent activity</CardTitle>
             <CardDescription>
-              Consecutive matching samples are grouped into sessions.
+              Consecutive matching activity intervals are grouped into sessions.
             </CardDescription>
           </CardHeader>
           <CardContent>

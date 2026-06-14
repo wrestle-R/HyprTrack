@@ -56,7 +56,7 @@ function ApplicationDetails({
         <SheetHeader className="border-b">
           <SheetTitle>{application?.windowTitle ?? "Application"}</SheetTitle>
           <SheetDescription>
-            Usage details derived from normalized HyprTrack samples.
+            Usage details derived from normalized HyprTrack activity.
           </SheetDescription>
         </SheetHeader>
         {application ? (
@@ -125,8 +125,8 @@ function ApplicationDetails({
                         {formatTimestamp(session.startAt, true)}
                       </p>
                       <p className="text-[0.65rem] text-muted-foreground">
-                        {session.sampleCount} one-minute{" "}
-                        {session.sampleCount === 1 ? "sample" : "samples"}
+                        {session.sampleCount} activity{" "}
+                        {session.sampleCount === 1 ? "interval" : "intervals"}
                       </p>
                     </div>
                     <span className="text-xs tabular-nums">

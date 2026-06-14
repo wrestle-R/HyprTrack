@@ -46,8 +46,25 @@ function roundShare(minutes: number, totalMinutes: number) {
     : Math.round((minutes / totalMinutes) * 10_000) / 100
 }
 
+function sampleMinutes(sample: ActivitySample) {
+  const endedAt =
+    sample.endedAt ??
+    new Date(new Date(sample.sampledAt).getTime() + 60_000).toISOString()
+  return (
+    (new Date(endedAt).getTime() - new Date(sample.sampledAt).getTime()) /
+    60_000
+  )
+}
+
+function roundMinutes(minutes: number) {
+  return Math.round(minutes * 100) / 100
+}
+
 function buildApplications(samples: ActivitySample[]): ApplicationUsage[] {
-  const totalMinutes = samples.length
+  const totalMinutes = samples.reduce(
+    (total, sample) => total + sampleMinutes(sample),
+    0
+  )
   const sessions = groupSessions(samples)
   const byApplication = new Map<
     string,
@@ -62,17 +79,18 @@ function buildApplications(samples: ActivitySample[]): ApplicationUsage[] {
 
   for (const sample of samples) {
     const key = `${sample.appClass}\u0000${sample.windowTitle}`
+    const minutes = sampleMinutes(sample)
     const current = byApplication.get(key)
     if (current) {
-      current.minutes += 1
-      current.lastSeen = sample.sampledAt
+      current.minutes += minutes
+      current.lastSeen = sample.endedAt ?? sample.sampledAt
     } else {
       byApplication.set(key, {
         appClass: sample.appClass,
         windowTitle: sample.windowTitle,
-        minutes: 1,
+        minutes,
         firstSeen: sample.sampledAt,
-        lastSeen: sample.sampledAt,
+        lastSeen: sample.endedAt ?? sample.sampledAt,
       })
     }
   }
@@ -88,6 +106,7 @@ function buildApplications(samples: ActivitySample[]): ApplicationUsage[] {
 
       return {
         ...application,
+        minutes: roundMinutes(application.minutes),
         share: roundShare(application.minutes, totalMinutes),
         sessionCount: applicationSessions.length,
         recentSessions: applicationSessions.slice(0, 5),
@@ -105,49 +124,72 @@ function buildTimeline(
   range: RangeKey,
   start: string
 ): TimelinePoint[] {
-  const buckets = new Map<string, number>()
-
-  for (const sample of samples) {
-    const bucket =
-      range === "today"
-        ? sample.sampledAt.slice(0, 13)
-        : sample.sampledAt.slice(0, 10)
-    buckets.set(bucket, (buckets.get(bucket) ?? 0) + 1)
-  }
-
   const orderedBuckets =
     range === "today"
       ? Array.from(
           { length: 24 },
-          (_, hour) =>
-            `${start.slice(0, 10)}T${hour.toString().padStart(2, "0")}`
+          (_, hour) => {
+            const bucket = `${start.slice(0, 10)}T${hour
+              .toString()
+              .padStart(2, "0")}`
+            const bucketStart = new Date(
+              `${bucket}:00:00+05:30`
+            ).getTime()
+            return {
+              bucket,
+              start: bucketStart,
+              end: bucketStart + 60 * 60_000,
+            }
+          }
         )
       : Array.from(
           { length: range === "7d" ? 7 : 30 },
           (_, index) => {
             const date = new Date(start)
             date.setUTCDate(date.getUTCDate() + index)
-            return new Intl.DateTimeFormat("en-CA", {
+            const bucket = new Intl.DateTimeFormat("en-CA", {
               timeZone: "Asia/Kolkata",
               year: "numeric",
               month: "2-digit",
               day: "2-digit",
             }).format(date)
+            const bucketStart = new Date(
+              `${bucket}T00:00:00+05:30`
+            ).getTime()
+            return {
+              bucket,
+              start: bucketStart,
+              end: bucketStart + 24 * 60 * 60_000,
+            }
           }
         )
 
-  return orderedBuckets.map((bucket) => ({
-    bucket,
-    label:
-      range === "today"
-        ? `${bucket.slice(11)}:00`
-        : new Intl.DateTimeFormat("en", {
-            month: "short",
-            day: "numeric",
-            timeZone: "Asia/Kolkata",
-          }).format(new Date(`${bucket}T00:00:00+05:30`)),
-    minutes: buckets.get(bucket) ?? 0,
-  }))
+  return orderedBuckets.map((bucket) => {
+    const minutes = samples.reduce((total, sample) => {
+      const sampleStart = new Date(sample.sampledAt).getTime()
+      const sampleEnd = new Date(sample.endedAt ?? sample.sampledAt).getTime()
+      const overlap = Math.max(
+        0,
+        Math.min(sampleEnd, bucket.end) - Math.max(sampleStart, bucket.start)
+      )
+      return total + overlap / 60_000
+    }, 0)
+
+    return {
+      bucket: bucket.bucket,
+      label:
+        range === "today"
+          ? `${bucket.bucket.slice(11)}:00`
+          : new Intl.DateTimeFormat("en", {
+              month: "short",
+              day: "numeric",
+              timeZone: "Asia/Kolkata",
+            }).format(
+              new Date(`${bucket.bucket}T00:00:00+05:30`)
+            ),
+      minutes: roundMinutes(minutes),
+    }
+  })
 }
 
 function calculateStreak(sampledAtValues: string[]) {
@@ -196,7 +238,12 @@ export function readOverview({
 
     return {
       range: effectiveRange,
-      trackedMinutes: samples.length,
+      trackedMinutes: roundMinutes(
+        samples.reduce(
+          (total, sample) => total + sampleMinutes(sample),
+          0
+        )
+      ),
       topApplication: applications[0] ?? null,
       streakDays: calculateStreak(
         streakRows.map((row) => row.sampledAt)

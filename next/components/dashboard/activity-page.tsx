@@ -154,7 +154,7 @@ export function ActivityPage() {
                   <TableHead>Started</TableHead>
                   <TableHead>Ended</TableHead>
                   <TableHead className="text-right">Duration</TableHead>
-                  <TableHead className="pr-4 text-right">Samples</TableHead>
+                  <TableHead className="pr-4 text-right">Intervals</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -102,7 +102,7 @@ export function AppSidebar() {
         </div>
         {state === "expanded" && health.data?.latestSampleAt ? (
           <p className="px-1 text-[0.65rem] text-muted-foreground">
-            Latest sample{" "}
+            Latest activity{" "}
             {new Date(health.data.latestSampleAt).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",

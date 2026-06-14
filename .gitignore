@@ -5,6 +5,7 @@
 /collector/hyprtrack.db
 *.db
 *.db-journal
+*.db.lock
 /collector/*.db-shm
 /collector/*.db
 

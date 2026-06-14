@@ -27,7 +27,7 @@ export function DashboardError({ message }: { message: string }) {
 
 export function DashboardEmpty({
   title = "No activity in this range",
-  description = "Collect a few samples or choose a wider date range.",
+  description = "Collect some activity or choose a wider date range.",
 }: {
   title?: string
   description?: string

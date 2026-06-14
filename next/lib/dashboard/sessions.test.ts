@@ -3,6 +3,34 @@ import { describe, expect, it } from "vitest"
 import { groupSessions } from "@/lib/dashboard/sessions"
 
 describe("groupSessions", () => {
+  it("uses exact interval durations and groups adjacent matching rows", () => {
+    const sessions = groupSessions([
+      {
+        sampledAt: "2026-06-14T10:00:00+05:30",
+        endedAt: "2026-06-14T10:02:30+05:30",
+        appClass: "zen",
+        windowTitle: "YouTube",
+      },
+      {
+        sampledAt: "2026-06-14T10:02:30+05:30",
+        endedAt: "2026-06-14T10:03:00+05:30",
+        appClass: "zen",
+        windowTitle: "YouTube",
+      },
+    ])
+
+    expect(sessions).toEqual([
+      {
+        startAt: "2026-06-14T10:00:00+05:30",
+        endAt: "2026-06-14T10:03:00+05:30",
+        appClass: "zen",
+        windowTitle: "YouTube",
+        durationMinutes: 3,
+        sampleCount: 2,
+      },
+    ])
+  })
+
   it("groups adjacent matching samples and counts one minute per sample", () => {
     const sessions = groupSessions([
       {

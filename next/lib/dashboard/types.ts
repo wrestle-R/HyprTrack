@@ -9,6 +9,7 @@ export type EffectiveRange = {
 
 export type ActivitySample = {
   sampledAt: string
+  endedAt?: string
   appClass: string
   windowTitle: string
 }

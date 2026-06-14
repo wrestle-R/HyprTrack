@@ -121,7 +121,7 @@ describe("dashboard analytics", () => {
       share: 50,
       sessionCount: 1,
       firstSeen: "2026-06-14T09:00:00+05:30",
-      lastSeen: "2026-06-14T09:01:00+05:30",
+      lastSeen: "2026-06-14T09:02:00+05:30",
     })
   })
 
@@ -131,5 +131,102 @@ describe("dashboard analytics", () => {
       sampleCount: 5,
       latestSampleAt: "2026-06-14T09:04:00+05:30",
     })
+  })
+
+  it("calculates exact interval durations and splits them across hours", () => {
+    const database = new Database(databasePath)
+    database.exec(`
+      ALTER TABLE activity_samples ADD COLUMN ended_at TEXT;
+      ALTER TABLE activity_samples ADD COLUMN last_seen_at TEXT;
+    `)
+    database
+      .prepare(
+        `INSERT INTO activity_samples (
+          sampled_at,
+          app_class,
+          window_title,
+          window_full,
+          ended_at,
+          last_seen_at
+        ) VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        "2026-06-14T09:30:00+05:30",
+        "zen",
+        "YouTube",
+        "private video title",
+        "2026-06-14T10:15:00+05:30",
+        "2026-06-14T10:15:00+05:30"
+      )
+    database.close()
+
+    const overview = readOverview({
+      databasePath,
+      range: "today",
+      now: new Date("2026-06-14T06:00:00.000Z"),
+    })
+
+    expect(overview.trackedMinutes).toBe(49)
+    expect(overview.topApplication).toMatchObject({
+      windowTitle: "YouTube",
+      minutes: 46,
+    })
+    expect(
+      overview.timeline.find((point) => point.label === "09:00")
+    ).toMatchObject({ minutes: 34 })
+    expect(
+      overview.timeline.find((point) => point.label === "10:00")
+    ).toMatchObject({ minutes: 15 })
+    expect(JSON.stringify(overview)).not.toContain("private video title")
+  })
+
+  it("clips intervals at the selected range and uses checkpoints for open rows", () => {
+    const database = new Database(databasePath)
+    database.exec(`
+      ALTER TABLE activity_samples ADD COLUMN ended_at TEXT;
+      ALTER TABLE activity_samples ADD COLUMN last_seen_at TEXT;
+      DELETE FROM activity_samples;
+    `)
+    const insert = database.prepare(
+      `INSERT INTO activity_samples (
+        sampled_at,
+        app_class,
+        window_title,
+        window_full,
+        ended_at,
+        last_seen_at
+      ) VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    insert.run(
+      "2026-06-13T23:50:00+05:30",
+      "code",
+      "VS Code",
+      "private title",
+      "2026-06-14T00:10:00+05:30",
+      "2026-06-14T00:10:00+05:30"
+    )
+    insert.run(
+      "2026-06-14T01:00:00+05:30",
+      "zen",
+      "GitHub",
+      "private title",
+      null,
+      "2026-06-14T01:20:00+05:30"
+    )
+    database.close()
+
+    const overview = readOverview({
+      databasePath,
+      range: "today",
+      now: new Date("2026-06-14T06:00:00.000Z"),
+    })
+
+    expect(overview.trackedMinutes).toBe(30)
+    expect(overview.applications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ windowTitle: "VS Code", minutes: 10 }),
+        expect.objectContaining({ windowTitle: "GitHub", minutes: 20 }),
+      ])
+    )
   })
 })
