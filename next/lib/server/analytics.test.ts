@@ -72,9 +72,14 @@ describe("dashboard analytics", () => {
     })
     expect(overview.streakDays).toBe(2)
     expect(overview.recentSessions).toHaveLength(3)
-    expect(overview.timeline).toHaveLength(24)
-    expect(overview.timeline.find((point) => point.label === "09:00")).toMatchObject({
+    expect(overview.timeline).toHaveLength(12)
+    expect(
+      overview.timeline.find((point) => point.label === "09:00")
+    ).toMatchObject({
       minutes: 4,
+    })
+    expect(overview.timeline.at(-1)).toMatchObject({
+      label: "14 Jun · 11:30 am",
     })
     expect(JSON.stringify(overview)).not.toContain("secret")
     expect(JSON.stringify(overview)).not.toContain("windowFull")
@@ -130,6 +135,19 @@ describe("dashboard analytics", () => {
       status: "connected",
       sampleCount: 5,
       latestSampleAt: "2026-06-14T09:04:00+05:30",
+    })
+  })
+
+  it("shows the current date and time at the end of longer timelines", () => {
+    const overview = readOverview({
+      databasePath,
+      range: "7d",
+      now: new Date("2026-06-14T06:00:00.000Z"),
+    })
+
+    expect(overview.timeline).toHaveLength(7)
+    expect(overview.timeline.at(-1)).toMatchObject({
+      label: "14 Jun · 11:30 am",
     })
   })
 

@@ -425,13 +425,17 @@ class HyprTrackTests(unittest.TestCase):
     def test_zen_recognizes_github_repository_titles(self):
         hyprtrack = load_hyprtrack()
 
-        self.assertEqual(
-            hyprtrack.normalize_window_title(
-                "zen",
-                "Technode-system/php-dashboard — Zen Browser",
-            ),
-            "GitHub",
-        )
+        titles = [
+            "Technode-system/php-dashboard — Zen Browser",
+            "Branches · wrestle-R/HyprTrack — Zen Browser",
+        ]
+
+        for title in titles:
+            with self.subTest(title=title):
+                self.assertEqual(
+                    hyprtrack.normalize_window_title("zen", title),
+                    "GitHub",
+                )
 
     def test_zen_groups_personal_website_titles(self):
         hyprtrack = load_hyprtrack()
@@ -504,6 +508,14 @@ class HyprTrackTests(unittest.TestCase):
                 "sleep 1 && hyprctl activewindow",
             ),
             "Terminal",
+        )
+
+        self.assertEqual(
+            hyprtrack.normalize_window_title(
+                "com.stremio.stremio",
+                "Stremio - Freedom to Stream",
+            ),
+            "Stremio",
         )
 
     def test_record_sample_skips_insert_when_hyprctl_fails(self):

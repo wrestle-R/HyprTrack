@@ -5,6 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { usePathname } from "next/navigation"
 
 import { useDashboard } from "@/components/dashboard/dashboard-provider"
+import { AutoRefreshControl } from "@/components/layout/auto-refresh-control"
 import { RangeControl } from "@/components/layout/range-control"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { getPageTitle } from "@/components/layout/nav-config"
@@ -38,6 +39,7 @@ export function AppHeader() {
       </Breadcrumb>
       <div className="ml-auto flex items-center gap-2">
         {isSettings ? null : <RangeControl />}
+        {isSettings ? null : <AutoRefreshControl />}
         <Button
           type="button"
           variant="outline"

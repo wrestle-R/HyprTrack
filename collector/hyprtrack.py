@@ -29,6 +29,7 @@ APP_LABELS = {
     "code-oss": "VS Code",
     "visual studio code": "VS Code",
     "kitty": "Terminal",
+    "com.stremio.stremio": "Stremio",
 }
 ZEN_SERVICES = {
     "chatgpt": "ChatGPT",
@@ -41,6 +42,9 @@ ZEN_SERVICES = {
 }
 GITHUB_REPOSITORY_TITLE = re.compile(
     r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+)
+GITHUB_REPOSITORY_CONTEXT_TITLE = re.compile(
+    r"^.+\s+·\s+[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
 )
 PERSONAL_WEBSITE_TITLES = {
     "home | blogs",
@@ -253,7 +257,9 @@ def normalize_window_title(app_class: str, window_title: str) -> str:
         if marker in folded_title:
             return label
 
-    if GITHUB_REPOSITORY_TITLE.fullmatch(title_without_browser):
+    if GITHUB_REPOSITORY_TITLE.fullmatch(
+        title_without_browser
+    ) or GITHUB_REPOSITORY_CONTEXT_TITLE.fullmatch(title_without_browser):
         return "GitHub"
 
     if " - " in title_without_browser:

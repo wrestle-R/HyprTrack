@@ -80,9 +80,7 @@ function Metric({
 
 export function OverviewPage() {
   const { range, preferences } = useDashboard()
-  const query = useDashboardQuery<OverviewData>(
-    `/api/overview?range=${range}`
-  )
+  const query = useDashboardQuery<OverviewData>(`/api/overview?range=${range}`)
 
   if (query.isLoading) {
     return <DashboardSkeleton />
@@ -164,7 +162,7 @@ export function OverviewPage() {
         </div>
         <ChartContainer
           config={chartConfig}
-          className="h-[320px] w-full aspect-auto"
+          className="aspect-auto h-[320px] w-full"
         >
           <AreaChart
             data={query.data.timeline}
@@ -190,16 +188,10 @@ export function OverviewPage() {
               tickLine={false}
               axisLine={false}
               tickMargin={12}
-              interval={
-                query.data.range.key === "today" ? 2 : "preserveStartEnd"
-              }
+              interval="preserveStartEnd"
+              minTickGap={36}
             />
-            <YAxis
-              allowDecimals
-              tickLine={false}
-              axisLine={false}
-              width={34}
-            />
+            <YAxis allowDecimals tickLine={false} axisLine={false} width={34} />
             <ChartTooltip
               cursor={false}
               content={<ChartTooltipContent indicator="line" />}
@@ -219,15 +211,13 @@ export function OverviewPage() {
         <Card className="shadow-none">
           <CardHeader>
             <CardTitle>Application usage</CardTitle>
-            <CardDescription>
-              Ranked by tracked duration.
-            </CardDescription>
+            <CardDescription>Ranked by tracked duration.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
             {query.data.applications.slice(0, 6).map((application, index) => (
               <div key={`${application.appClass}-${application.windowTitle}`}>
                 <div className="mb-2 flex items-center gap-3">
-                  <span className="w-5 text-xs tabular-nums text-muted-foreground">
+                  <span className="w-5 text-xs text-muted-foreground tabular-nums">
                     {String(index + 1).padStart(2, "0")}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -235,7 +225,7 @@ export function OverviewPage() {
                       <span className="truncate text-sm font-medium">
                         {application.windowTitle}
                       </span>
-                      <span className="text-xs tabular-nums text-muted-foreground">
+                      <span className="text-xs text-muted-foreground tabular-nums">
                         {formatDuration(application.minutes)}
                       </span>
                     </div>

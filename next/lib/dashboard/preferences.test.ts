@@ -19,6 +19,8 @@ describe("dashboard preferences", () => {
       defaultRange: "7d" as const,
       productiveTitles: ["VS Code", "GitHub"],
       tableDensity: "compact" as const,
+      fontSize: "large" as const,
+      sidebarWidth: "wide" as const,
     }
 
     expect(parsePreferences(serializePreferences(preferences))).toEqual(
@@ -30,5 +32,27 @@ describe("dashboard preferences", () => {
     expect(
       parsePreferences(JSON.stringify({ version: 2, theme: "dark" }))
     ).toEqual(DEFAULT_PREFERENCES)
+  })
+
+  it("fills new display preferences when reading an older document", () => {
+    expect(
+      parsePreferences(
+        JSON.stringify({
+          version: 1,
+          theme: "dark",
+          defaultRange: "7d",
+          productiveTitles: ["GitHub"],
+          tableDensity: "compact",
+        })
+      )
+    ).toEqual({
+      version: 1,
+      theme: "dark",
+      defaultRange: "7d",
+      productiveTitles: ["GitHub"],
+      tableDensity: "compact",
+      fontSize: "default",
+      sidebarWidth: "default",
+    })
   })
 })
