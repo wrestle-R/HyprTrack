@@ -13,21 +13,20 @@ export function HyprTrackMark({ title, ...props }: HyprTrackMarkProps) {
       {...props}
     >
       {title ? <title>{title}</title> : null}
-      <rect width="64" height="64" rx="17" fill="var(--foreground)" />
       <path
-        d="M18 17v30M46 17v30"
+        d="M14 8v48M50 8v48"
         fill="none"
-        stroke="var(--background)"
+        stroke="var(--foreground)"
         strokeLinecap="round"
-        strokeWidth="7"
+        strokeWidth="6"
       />
       <path
-        d="M17 34h9l4-10 7 20 4-10h7"
+        d="M7 34h17l6-14 8 27 6-13h13"
         fill="none"
         stroke="var(--primary)"
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeWidth="5"
+        strokeWidth="5.5"
       />
     </svg>
   )
