@@ -40,14 +40,18 @@ chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
 ```
 
-The final command launches HyprTrack. Keep the AppImage at this path because
-login autostart records its location. If you move it later, launch it manually,
-disable **Launch at login** in Settings, and enable it again.
+The final command launches HyprTrack and registers **HyprTrack Desktop** in the
+current user's application launcher with its icon. Keep the AppImage at this
+path because both the launcher and login autostart record its location. If you
+move it later, launch it manually from the new path to update the application
+launcher, then disable **Launch at login** in Settings and enable it again.
 
 To remove the AppImage:
 
 ```bash
 rm ~/.local/bin/hyprtrack-desktop.AppImage
+rm ~/.local/share/applications/com.hyprtrack.desktop
+rm ~/.local/share/icons/hicolor/128x128/apps/hyprtrack-desktop.png
 ```
 
 Disable **Launch at login** before removing it.
@@ -63,6 +67,8 @@ AppImage:
 
 ```bash
 rm ~/.local/bin/hyprtrack-desktop.AppImage
+rm ~/.local/share/applications/com.hyprtrack.desktop
+rm ~/.local/share/icons/hicolor/128x128/apps/hyprtrack-desktop.png
 ```
 
 Application data remains in:

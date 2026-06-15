@@ -1,5 +1,6 @@
 mod analytics;
 mod collector;
+mod desktop_integration;
 mod storage;
 
 use std::{
@@ -13,6 +14,7 @@ use analytics::{
     HealthData, OverviewData,
 };
 use collector::CollectorHandle;
+use desktop_integration::configure_appimage_desktop_integration;
 use serde::Serialize;
 use storage::{prepare_database, MigrationResult};
 use tauri::{
@@ -316,6 +318,9 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            if let Err(error) = configure_appimage_desktop_integration() {
+                eprintln!("HyprTrack could not install its application launcher: {error}");
+            }
             app.handle().plugin(tauri_plugin_autostart::init(
                 MacosLauncher::LaunchAgent,
                 Some(vec!["--autostart"]),
