@@ -881,7 +881,7 @@ function SettingsPage({
             Browser
           </button>
         </div>
-        <div className="toggle-list">
+        <div className="toggle-list productive-app-list">
           {visibleApplications.map((application) => {
             const checked = preferences.productiveTitles.includes(
               application.windowTitle
@@ -889,9 +889,9 @@ function SettingsPage({
             return (
               <div
                 key={`${application.appClass}-${application.windowTitle}`}
-                className="toggle-row"
+                className="toggle-row productive-app-row"
               >
-                <div>
+                <div className="productive-app-copy">
                   <strong>{application.windowTitle}</strong>
                   <p>{getApplicationSourceLabel(application.appClass)}</p>
                 </div>
