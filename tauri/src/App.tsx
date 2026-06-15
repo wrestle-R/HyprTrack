@@ -430,6 +430,7 @@ function OverviewPage({
               <p>Consecutive matching intervals are grouped into sessions.</p>
             </div>
           </div>
+          <div className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -452,6 +453,7 @@ function OverviewPage({
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </section>
     </div>
@@ -556,6 +558,7 @@ function ActivityPage({
         />
       ) : (
         <section className="panel">
+          <div className="table-scroll">
           <table className={`data-table ${compact ? "compact" : ""}`}>
             <thead>
               <tr>
@@ -582,6 +585,7 @@ function ActivityPage({
               ))}
             </tbody>
           </table>
+          </div>
         </section>
       )}
 
@@ -677,6 +681,7 @@ function ApplicationsPage({
       </section>
 
       <section className="panel full-width-panel">
+        <div className="table-scroll">
         <table className="data-table">
           <thead>
             <tr>
@@ -708,6 +713,7 @@ function ApplicationsPage({
             ))}
           </tbody>
         </table>
+        </div>
       </section>
     </div>
   )
@@ -841,7 +847,7 @@ function SettingsPage({
         <div className="toggle-row settings-toggle-row">
           <div>
             <strong>Launch at login</strong>
-            <p>Linux autostart for the desktop shell.</p>
+            <p>Start tracking in the system tray when you log in.</p>
           </div>
           <label className="switch">
             <input

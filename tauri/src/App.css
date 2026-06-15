@@ -482,7 +482,15 @@ button {
 
 .data-table {
   width: 100%;
+  min-width: 46rem;
   border-collapse: collapse;
+}
+
+.table-scroll {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
 }
 
 .data-table th,
@@ -703,29 +711,45 @@ button {
 
 @media (max-width: 900px) {
   .desktop-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: 5rem minmax(0, 1fr);
   }
 
   .sidebar {
-    border-right: 0;
-    border-bottom: 1px solid var(--sidebar-border);
+    padding-inline: 0.65rem;
   }
 
-  .nav-stack {
-    flex-direction: row;
-    flex-wrap: wrap;
+  .brand-block {
+    justify-content: center;
+    padding-inline: 0;
   }
 
-  .topbar {
-    flex-direction: column;
-    align-items: flex-start;
+  .brand-block > div,
+  .nav-item strong {
+    display: none;
+  }
+
+  .nav-item {
+    justify-content: center;
+    padding-inline: 0;
   }
 
   .topbar-actions,
   .filters-row,
   .pager {
-    width: 100%;
     flex-wrap: wrap;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    padding-inline: 1rem;
+  }
+
+  .topbar-actions {
+    justify-content: flex-end;
+  }
+
+  .content-area {
+    padding-inline: 1rem;
   }
 
   .subtle-copy {
@@ -734,6 +758,51 @@ button {
 }
 
 @media (max-width: 720px) {
+  .desktop-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .sidebar {
+    padding: 0.6rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--sidebar-border);
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .brand-block {
+    border-bottom: 0;
+    padding: 0;
+  }
+
+  .brand-mark {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .nav-stack {
+    flex: 1;
+    min-width: 0;
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 0.35rem;
+  }
+
+  .nav-item {
+    width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .topbar {
+    flex-direction: column;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .metrics-grid,
   .settings-grid,
   .split-grid {
@@ -747,5 +816,14 @@ button {
   .hero-panel {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .content-area {
+    padding: 0.85rem;
+  }
+
+  .panel,
+  .chart-panel {
+    padding-inline: 0.85rem;
   }
 }

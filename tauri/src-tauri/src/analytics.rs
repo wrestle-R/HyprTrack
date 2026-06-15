@@ -50,7 +50,11 @@ fn strip_browser_suffix(class_key: &str, value: &str) -> String {
     title
 }
 
-fn resolve_browser_source_title(class_key: &str, window_title: &str, window_full: Option<&str>) -> String {
+fn resolve_browser_source_title(
+    class_key: &str,
+    window_title: &str,
+    window_full: Option<&str>,
+) -> String {
     let Some(full_title) = window_full.map(str::trim).filter(|value| !value.is_empty()) else {
         return window_title.to_string();
     };
@@ -295,7 +299,11 @@ fn open_database(database_path: &str) -> Result<Connection, String> {
         .collect::<Result<Vec<_>, _>>()
         .map_err(|error| error.to_string())?;
     let required = ["sampled_at", "app_class", "window_title"];
-    if columns.is_empty() || required.iter().any(|column| !columns.iter().any(|candidate| candidate == column)) {
+    if columns.is_empty()
+        || required
+            .iter()
+            .any(|column| !columns.iter().any(|candidate| candidate == column))
+    {
         return Err("The activity database schema is not supported.".into());
     }
     drop(statement);
@@ -365,13 +373,13 @@ fn read_samples(
 
     let query = if has_intervals {
         if has_window_full {
-        "SELECT sampled_at, app_class, window_title, window_full, ended_at, last_seen_at
+            "SELECT sampled_at, app_class, window_title, window_full, ended_at, last_seen_at
          FROM activity_samples
          WHERE sampled_at <= ?
            AND (sampled_at >= ? OR ended_at >= ? OR last_seen_at >= ?)
          ORDER BY sampled_at ASC"
         } else {
-        "SELECT sampled_at, app_class, window_title, NULL AS window_full, ended_at, last_seen_at
+            "SELECT sampled_at, app_class, window_title, NULL AS window_full, ended_at, last_seen_at
          FROM activity_samples
          WHERE sampled_at <= ?
            AND (sampled_at >= ? OR ended_at >= ? OR last_seen_at >= ?)
@@ -379,19 +387,21 @@ fn read_samples(
         }
     } else {
         if has_window_full {
-        "SELECT sampled_at, app_class, window_title, window_full, NULL AS ended_at, NULL AS last_seen_at
+            "SELECT sampled_at, app_class, window_title, window_full, NULL AS ended_at, NULL AS last_seen_at
          FROM activity_samples
          WHERE sampled_at >= ? AND sampled_at <= ?
          ORDER BY sampled_at ASC"
         } else {
-        "SELECT sampled_at, app_class, window_title, NULL AS window_full, NULL AS ended_at, NULL AS last_seen_at
+            "SELECT sampled_at, app_class, window_title, NULL AS window_full, NULL AS ended_at, NULL AS last_seen_at
          FROM activity_samples
          WHERE sampled_at >= ? AND sampled_at <= ?
          ORDER BY sampled_at ASC"
         }
     };
 
-    let mut statement = connection.prepare(query).map_err(|error| error.to_string())?;
+    let mut statement = connection
+        .prepare(query)
+        .map_err(|error| error.to_string())?;
     let params: Vec<String> = if has_intervals {
         vec![
             format_seconds(range.end),
@@ -418,14 +428,7 @@ fn read_samples(
 
     let mut samples = Vec::new();
     for row in mapped {
-        let (
-            sampled_at_raw,
-            app_class,
-            window_title,
-            window_full,
-            ended_at_raw,
-            last_seen_raw,
-        ) =
+        let (sampled_at_raw, app_class, window_title, window_full, ended_at_raw, last_seen_raw) =
             row.map_err(|error| error.to_string())?;
         let sampled_at = parse_time(&sampled_at_raw)?;
         let legacy_end = add_minute(&sampled_at);
@@ -466,7 +469,9 @@ fn read_samples(
 }
 
 fn sample_minutes(sample: &ActivitySample) -> f64 {
-    let end = sample.ended_at.unwrap_or_else(|| add_minute(&sample.sampled_at));
+    let end = sample
+        .ended_at
+        .unwrap_or_else(|| add_minute(&sample.sampled_at));
     ((end.timestamp_millis() - sample.sampled_at.timestamp_millis()) as f64) / 60_000.0
 }
 
@@ -480,9 +485,12 @@ fn build_sessions(samples: &[ActivitySample]) -> Vec<ActivitySession> {
     let mut sessions: Vec<ActivitySession> = Vec::new();
 
     for sample in ordered {
-        let end = sample.ended_at.unwrap_or_else(|| add_minute(&sample.sampled_at));
-        let is_continuation = sessions.last().map_or(false, |current| {
-            if current.app_class != sample.app_class || current.window_title != sample.window_title {
+        let end = sample
+            .ended_at
+            .unwrap_or_else(|| add_minute(&sample.sampled_at));
+        let is_continuation = sessions.last().is_some_and(|current| {
+            if current.app_class != sample.app_class || current.window_title != sample.window_title
+            {
                 return false;
             }
             let current_end = parse_time(&current.end_at).ok();
@@ -496,12 +504,16 @@ fn build_sessions(samples: &[ActivitySample]) -> Vec<ActivitySession> {
         if is_continuation {
             let current = sessions.last_mut().expect("session exists");
             current.sample_count += 1;
-            current.duration_minutes = round_minutes(current.duration_minutes + sample_minutes(&sample));
+            current.duration_minutes =
+                round_minutes(current.duration_minutes + sample_minutes(&sample));
             current.end_at = format_original_precision(end, &current.end_at);
         } else {
             let duration_minutes = round_minutes(sample_minutes(&sample));
             sessions.push(ActivitySession {
-                start_at: format_original_precision(sample.sampled_at, &format_seconds(sample.sampled_at)),
+                start_at: format_original_precision(
+                    sample.sampled_at,
+                    &format_seconds(sample.sampled_at),
+                ),
                 end_at: format_original_precision(end, &format_seconds(end)),
                 app_class: sample.app_class,
                 window_title: sample.window_title,
@@ -521,16 +533,24 @@ fn build_applications(samples: &[ActivitySample]) -> Vec<ApplicationUsage> {
 
     for sample in samples {
         let minutes = sample_minutes(sample);
-        if let Some(entry) = entries.iter_mut().find(|entry| entry.0 == sample.app_class && entry.1 == sample.window_title) {
+        if let Some(entry) = entries
+            .iter_mut()
+            .find(|entry| entry.0 == sample.app_class && entry.1 == sample.window_title)
+        {
             entry.2 += minutes;
             entry.4 = format_original_precision(
-                sample.ended_at.unwrap_or_else(|| add_minute(&sample.sampled_at)),
+                sample
+                    .ended_at
+                    .unwrap_or_else(|| add_minute(&sample.sampled_at)),
                 &entry.4,
             );
         } else {
-            let first_seen = format_original_precision(sample.sampled_at, &format_seconds(sample.sampled_at));
+            let first_seen =
+                format_original_precision(sample.sampled_at, &format_seconds(sample.sampled_at));
             let last_seen = format_original_precision(
-                sample.ended_at.unwrap_or_else(|| add_minute(&sample.sampled_at)),
+                sample
+                    .ended_at
+                    .unwrap_or_else(|| add_minute(&sample.sampled_at)),
                 &format_seconds(sample.sampled_at),
             );
             entries.push((
@@ -545,29 +565,33 @@ fn build_applications(samples: &[ActivitySample]) -> Vec<ApplicationUsage> {
 
     let mut applications = entries
         .into_iter()
-        .map(|(app_class, window_title, minutes, first_seen, last_seen)| {
-            let recent_sessions = sessions
-                .iter()
-                .filter(|session| session.app_class == app_class && session.window_title == window_title)
-                .cloned()
-                .rev()
-                .take(5)
-                .collect::<Vec<_>>();
-            ApplicationUsage {
-                window_title,
-                app_class,
-                minutes: round_minutes(minutes),
-                share: if total_minutes == 0.0 {
-                    0.0
-                } else {
-                    ((minutes / total_minutes) * 10_000.0).round() / 100.0
-                },
-                session_count: recent_sessions.len(),
-                first_seen,
-                last_seen,
-                recent_sessions,
-            }
-        })
+        .map(
+            |(app_class, window_title, minutes, first_seen, last_seen)| {
+                let recent_sessions = sessions
+                    .iter()
+                    .filter(|session| {
+                        session.app_class == app_class && session.window_title == window_title
+                    })
+                    .cloned()
+                    .rev()
+                    .take(5)
+                    .collect::<Vec<_>>();
+                ApplicationUsage {
+                    window_title,
+                    app_class,
+                    minutes: round_minutes(minutes),
+                    share: if total_minutes == 0.0 {
+                        0.0
+                    } else {
+                        ((minutes / total_minutes) * 10_000.0).round() / 100.0
+                    },
+                    session_count: recent_sessions.len(),
+                    first_seen,
+                    last_seen,
+                    recent_sessions,
+                }
+            },
+        )
         .collect::<Vec<_>>();
 
     applications.sort_by(|left, right| {
@@ -585,20 +609,34 @@ fn build_timeline(samples: &[ActivitySample], range: &EffectiveRange) -> Vec<Tim
     if range.key == RANGE_TODAY {
         for hour in 0..=range.end.hour() {
             let start = ist()
-                .with_ymd_and_hms(range.start.year(), range.start.month(), range.start.day(), hour, 0, 0)
+                .with_ymd_and_hms(
+                    range.start.year(),
+                    range.start.month(),
+                    range.start.day(),
+                    hour,
+                    0,
+                    0,
+                )
                 .single()
                 .expect("valid hour");
             let end = start + Duration::hours(1);
             let minutes: f64 = samples
                 .iter()
                 .map(|sample| {
-                    let sample_end = sample.ended_at.unwrap_or_else(|| add_minute(&sample.sampled_at));
-                    let overlap_start = if sample.sampled_at > start { sample.sampled_at } else { start };
+                    let sample_end = sample
+                        .ended_at
+                        .unwrap_or_else(|| add_minute(&sample.sampled_at));
+                    let overlap_start = if sample.sampled_at > start {
+                        sample.sampled_at
+                    } else {
+                        start
+                    };
                     let overlap_end = if sample_end < end { sample_end } else { end };
                     if overlap_end <= overlap_start {
                         0.0
                     } else {
-                        (overlap_end.timestamp_millis() - overlap_start.timestamp_millis()) as f64 / 60_000.0
+                        (overlap_end.timestamp_millis() - overlap_start.timestamp_millis()) as f64
+                            / 60_000.0
                     }
                 })
                 .sum();
@@ -621,13 +659,20 @@ fn build_timeline(samples: &[ActivitySample], range: &EffectiveRange) -> Vec<Tim
             let minutes: f64 = samples
                 .iter()
                 .map(|sample| {
-                    let sample_end = sample.ended_at.unwrap_or_else(|| add_minute(&sample.sampled_at));
-                    let overlap_start = if sample.sampled_at > start { sample.sampled_at } else { start };
+                    let sample_end = sample
+                        .ended_at
+                        .unwrap_or_else(|| add_minute(&sample.sampled_at));
+                    let overlap_start = if sample.sampled_at > start {
+                        sample.sampled_at
+                    } else {
+                        start
+                    };
                     let overlap_end = if sample_end < end { sample_end } else { end };
                     if overlap_end <= overlap_start {
                         0.0
                     } else {
-                        (overlap_end.timestamp_millis() - overlap_start.timestamp_millis()) as f64 / 60_000.0
+                        (overlap_end.timestamp_millis() - overlap_start.timestamp_millis()) as f64
+                            / 60_000.0
                     }
                 })
                 .sum();
@@ -648,7 +693,9 @@ fn build_timeline(samples: &[ActivitySample], range: &EffectiveRange) -> Vec<Tim
 
 fn calculate_streak(connection: &Connection, end: &DateTime<FixedOffset>) -> Result<usize, String> {
     let mut statement = connection
-        .prepare("SELECT sampled_at FROM activity_samples WHERE sampled_at <= ? ORDER BY sampled_at ASC")
+        .prepare(
+            "SELECT sampled_at FROM activity_samples WHERE sampled_at <= ? ORDER BY sampled_at ASC",
+        )
         .map_err(|error| error.to_string())?;
     let values = statement
         .query_map([format_seconds(*end)], |row| row.get::<_, String>(0))
@@ -689,7 +736,9 @@ pub fn read_overview(database_path: &str, range_key: &str) -> Result<OverviewDat
     let tracked_minutes = round_minutes(samples.iter().map(sample_minutes).sum());
     let streak_days = calculate_streak(&connection, &range.end)?;
     let latest_sample_at = connection
-        .query_row("SELECT MAX(sampled_at) FROM activity_samples", [], |row| row.get::<_, Option<String>>(0))
+        .query_row("SELECT MAX(sampled_at) FROM activity_samples", [], |row| {
+            row.get::<_, Option<String>>(0)
+        })
         .map_err(|error| error.to_string())?;
 
     Ok(OverviewData {
@@ -715,17 +764,26 @@ pub fn read_activity(
     let connection = open_database(database_path)?;
     let range = resolve_range(range_key)?;
     let samples = read_samples(&connection, &range)?;
-    let mut app_classes = samples.iter().map(|sample| sample.app_class.clone()).collect::<Vec<_>>();
+    let mut app_classes = samples
+        .iter()
+        .map(|sample| sample.app_class.clone())
+        .collect::<Vec<_>>();
     app_classes.sort();
     app_classes.dedup();
     let normalized_search = search.unwrap_or_default().trim().to_lowercase();
     let filtered = samples
         .into_iter()
         .filter(|sample| {
-            let matches_app = app.as_ref().map(|value| value == &sample.app_class).unwrap_or(true);
+            let matches_app = app
+                .as_ref()
+                .map(|value| value == &sample.app_class)
+                .unwrap_or(true);
             let matches_search = normalized_search.is_empty()
                 || sample.app_class.to_lowercase().contains(&normalized_search)
-                || sample.window_title.to_lowercase().contains(&normalized_search);
+                || sample
+                    .window_title
+                    .to_lowercase()
+                    .contains(&normalized_search);
             matches_app && matches_search
         })
         .collect::<Vec<_>>();
@@ -735,7 +793,11 @@ pub fn read_activity(
     let total_pages = total_items.max(1).div_ceil(page_size.max(1));
     let page = page.max(1);
     let start_index = (page - 1) * page_size;
-    let paged = sessions.into_iter().skip(start_index).take(page_size).collect::<Vec<_>>();
+    let paged = sessions
+        .into_iter()
+        .skip(start_index)
+        .take(page_size)
+        .collect::<Vec<_>>();
 
     Ok(ActivityData {
         range: range_payload(&range),
@@ -763,8 +825,14 @@ pub fn read_applications(
         .into_iter()
         .filter(|application| {
             normalized_search.is_empty()
-                || application.app_class.to_lowercase().contains(&normalized_search)
-                || application.window_title.to_lowercase().contains(&normalized_search)
+                || application
+                    .app_class
+                    .to_lowercase()
+                    .contains(&normalized_search)
+                || application
+                    .window_title
+                    .to_lowercase()
+                    .contains(&normalized_search)
         })
         .collect::<Vec<_>>();
 

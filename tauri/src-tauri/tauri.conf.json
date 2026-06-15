@@ -16,8 +16,8 @@
         "title": "HyprTrack Desktop",
         "width": 1520,
         "height": 960,
-        "minWidth": 1080,
-        "minHeight": 720
+        "minWidth": 640,
+        "minHeight": 520
       }
     ],
     "security": {
@@ -26,7 +26,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["appimage", "deb", "rpm"],
+    "category": "Utility",
+    "shortDescription": "Local Hyprland activity intelligence",
+    "longDescription": "Track active Hyprland windows locally and explore activity analytics from a private SQLite database.",
+    "copyright": "Copyright (c) 2026 Russell Daniel Paul",
+    "licenseFile": "../../LICENSE",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

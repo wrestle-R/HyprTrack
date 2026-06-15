@@ -1,31 +1,31 @@
 mod analytics;
+mod collector;
+mod storage;
 
 use std::{
-    fs::OpenOptions,
-    path::Path,
-    process::{Child, Command, Stdio},
+    fs,
+    path::{Path, PathBuf},
     sync::Mutex,
 };
 
 use analytics::{
-    read_activity, read_applications, read_health, read_overview, ApplicationsData, HealthData,
-    OverviewData, ActivityData,
+    read_activity, read_applications, read_health, read_overview, ActivityData, ApplicationsData,
+    HealthData, OverviewData,
 };
-use fs2::FileExt;
+use collector::CollectorHandle;
 use serde::Serialize;
+use storage::{prepare_database, MigrationResult};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    AppHandle, Emitter, Manager, State, WindowEvent,
+    AppHandle, Emitter, Manager, RunEvent, State, WindowEvent,
 };
 #[cfg(desktop)]
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
-const DEFAULT_DB_PATH: &str = "/home/rdp/Desktop/code/HyprTrack/collector/hyprtrack.db";
-const COLLECTOR_DIR: &str = "/home/rdp/Desktop/code/HyprTrack/collector";
-
 struct AppState {
-    collector: Mutex<Option<Child>>,
+    database_path: PathBuf,
+    collector: Mutex<Option<CollectorHandle>>,
 }
 
 #[derive(Serialize, Clone)]
@@ -44,147 +44,89 @@ struct AutostartStatus {
     enabled: bool,
 }
 
-fn latest_sample_at() -> Option<String> {
-    read_health(DEFAULT_DB_PATH).ok().and_then(|health| health.latest_sample_at)
+fn database_string(state: &AppState) -> String {
+    state.database_path.to_string_lossy().into_owned()
 }
 
-fn collector_lock_is_held() -> Result<bool, String> {
-    let lock_path = format!("{DEFAULT_DB_PATH}.lock");
-    let file = OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .read(true)
-        .write(true)
-        .open(lock_path)
-        .map_err(|error| error.to_string())?;
-
-    match file.try_lock_exclusive() {
-        Ok(()) => {
-            let _ = file.unlock();
-            Ok(false)
-        }
-        Err(_) => Ok(true),
-    }
-}
-
-fn managed_pid(state: &AppState) -> Result<Option<u32>, String> {
-    let mut guard = state.collector.lock().map_err(|_| "Collector state is unavailable.".to_string())?;
-    if let Some(child) = guard.as_mut() {
-        match child.try_wait().map_err(|error| error.to_string())? {
-            Some(_) => {
-                *guard = None;
-                Ok(None)
-            }
-            None => Ok(Some(child.id())),
-        }
-    } else {
-        Ok(None)
-    }
+fn latest_sample_at(state: &AppState) -> Option<String> {
+    read_health(&database_string(state))
+        .ok()
+        .and_then(|health| health.latest_sample_at)
 }
 
 fn resolve_collector_status(state: &AppState) -> Result<CollectorStatus, String> {
-    let latest_sample_at = latest_sample_at();
-    if let Some(pid) = managed_pid(state)? {
-        return Ok(CollectorStatus {
-            state: "running_app",
-            db_path: DEFAULT_DB_PATH.to_string(),
-            latest_sample_at,
-            pid: Some(pid),
-            managed_by_app: true,
-            message: "Collector is running under desktop control.".into(),
-        });
-    }
-
-    if collector_lock_is_held()? {
-        return Ok(CollectorStatus {
-            state: "running_external",
-            db_path: DEFAULT_DB_PATH.to_string(),
-            latest_sample_at,
-            pid: None,
-            managed_by_app: false,
-            message: "Collector is already running outside the desktop app.".into(),
-        });
-    }
-
+    let guard = state
+        .collector
+        .lock()
+        .map_err(|_| "Collector state is unavailable.".to_string())?;
+    let runtime = guard
+        .as_ref()
+        .and_then(|handle| handle.state.lock().ok().map(|state| state.clone()));
+    let (collector_state, message) = match runtime {
+        Some(runtime) if runtime.running => (
+            "running_app",
+            runtime
+                .last_error
+                .map(|error| format!("Collector is reconnecting: {error}"))
+                .unwrap_or_else(|| "Collector is running inside HyprTrack Desktop.".into()),
+        ),
+        Some(runtime) => (
+            "error",
+            runtime
+                .last_error
+                .unwrap_or_else(|| "Collector stopped unexpectedly.".into()),
+        ),
+        None => ("stopped", "Collector is stopped.".into()),
+    };
     Ok(CollectorStatus {
-        state: "stopped",
-        db_path: DEFAULT_DB_PATH.to_string(),
-        latest_sample_at,
-        pid: None,
-        managed_by_app: false,
-        message: "Collector is not running.".into(),
+        state: collector_state,
+        db_path: database_string(state),
+        latest_sample_at: latest_sample_at(state),
+        pid: Some(std::process::id()),
+        managed_by_app: true,
+        message,
     })
 }
 
-fn emit_refresh(app: &AppHandle) {
-    let _ = app.emit("hyprtrack://refresh", ());
-}
-
-fn show_main_window_impl(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
-}
-
-fn hide_main_window_impl(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.hide();
-    }
-}
-
 fn start_collector_impl(state: &AppState) -> Result<CollectorStatus, String> {
-    let status = resolve_collector_status(state)?;
-    if status.state == "running_app" || status.state == "running_external" {
-        return Ok(status);
+    let mut guard = state
+        .collector
+        .lock()
+        .map_err(|_| "Collector state is unavailable.".to_string())?;
+    let running = guard
+        .as_ref()
+        .and_then(|handle| handle.state.lock().ok())
+        .is_some_and(|runtime| runtime.running);
+    if !running {
+        if let Some(handle) = guard.take() {
+            handle.stop();
+        }
+        *guard = Some(collector::start(state.database_path.clone())?);
     }
-
-    if !Path::new(DEFAULT_DB_PATH).exists() {
-        return Err(format!("Database path does not exist: {DEFAULT_DB_PATH}"));
-    }
-
-    let mut guard = state.collector.lock().map_err(|_| "Collector state is unavailable.".to_string())?;
-    let child = Command::new("python3")
-        .arg("hyprtrack.py")
-        .arg("--db")
-        .arg(DEFAULT_DB_PATH)
-        .current_dir(COLLECTOR_DIR)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|error| error.to_string())?;
-    *guard = Some(child);
     drop(guard);
-
     resolve_collector_status(state)
 }
 
 fn stop_collector_impl(state: &AppState) -> Result<CollectorStatus, String> {
-    let mut guard = state.collector.lock().map_err(|_| "Collector state is unavailable.".to_string())?;
-    if let Some(child) = guard.as_mut() {
-        child.kill().map_err(|error| error.to_string())?;
-        let _ = child.wait();
-        *guard = None;
+    let handle = state
+        .collector
+        .lock()
+        .map_err(|_| "Collector state is unavailable.".to_string())?
+        .take();
+    if let Some(handle) = handle {
+        handle.stop();
     }
-    drop(guard);
-
     resolve_collector_status(state)
 }
 
 fn restart_collector_impl(state: &AppState) -> Result<CollectorStatus, String> {
-    let current = resolve_collector_status(state)?;
-    if current.state == "running_external" {
-        return Ok(current);
-    }
     let _ = stop_collector_impl(state)?;
     start_collector_impl(state)
 }
 
 #[tauri::command]
-fn get_overview(range: String) -> Result<OverviewData, String> {
-    read_overview(DEFAULT_DB_PATH, &range)
+fn get_overview(range: String, state: State<'_, AppState>) -> Result<OverviewData, String> {
+    read_overview(&database_string(&state), &range)
 }
 
 #[tauri::command]
@@ -194,18 +136,30 @@ fn get_activity(
     page_size: usize,
     app: Option<String>,
     search: Option<String>,
+    state: State<'_, AppState>,
 ) -> Result<ActivityData, String> {
-    read_activity(DEFAULT_DB_PATH, &range, app, search, page, page_size)
+    read_activity(
+        &database_string(&state),
+        &range,
+        app,
+        search,
+        page,
+        page_size,
+    )
 }
 
 #[tauri::command]
-fn get_applications(range: String, search: Option<String>) -> Result<ApplicationsData, String> {
-    read_applications(DEFAULT_DB_PATH, &range, search)
+fn get_applications(
+    range: String,
+    search: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<ApplicationsData, String> {
+    read_applications(&database_string(&state), &range, search)
 }
 
 #[tauri::command]
-fn get_health() -> Result<HealthData, String> {
-    read_health(DEFAULT_DB_PATH)
+fn get_health(state: State<'_, AppState>) -> Result<HealthData, String> {
+    read_health(&database_string(&state))
 }
 
 #[tauri::command]
@@ -236,7 +190,10 @@ fn show_main_window(app: AppHandle) {
 #[tauri::command]
 fn get_autostart_status(app: AppHandle) -> Result<AutostartStatus, String> {
     Ok(AutostartStatus {
-        enabled: app.autolaunch().is_enabled().map_err(|error| error.to_string())?,
+        enabled: app
+            .autolaunch()
+            .is_enabled()
+            .map_err(|error| error.to_string())?,
     })
 }
 
@@ -253,15 +210,36 @@ fn set_autostart(app: AppHandle, enabled: bool) -> Result<AutostartStatus, Strin
     })
 }
 
+fn emit_refresh(app: &AppHandle) {
+    let _ = app.emit("hyprtrack://refresh", ());
+}
+
+fn show_main_window_impl(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+fn hide_main_window_impl(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+}
+
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Show window", true, None::<&str>)?;
     let hide = MenuItem::with_id(app, "hide", "Hide window", true, None::<&str>)?;
     let refresh = MenuItem::with_id(app, "refresh", "Refresh data", true, None::<&str>)?;
-    let start = MenuItem::with_id(app, "start", "Start collector", true, None::<&str>)?;
-    let stop = MenuItem::with_id(app, "stop", "Stop collector", true, None::<&str>)?;
-    let restart = MenuItem::with_id(app, "restart", "Restart collector", true, None::<&str>)?;
+    let start = MenuItem::with_id(app, "start", "Start tracking", true, None::<&str>)?;
+    let stop = MenuItem::with_id(app, "stop", "Stop tracking", true, None::<&str>)?;
+    let restart = MenuItem::with_id(app, "restart", "Restart tracking", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &hide, &refresh, &start, &stop, &restart, &quit])?;
+    let menu = Menu::with_items(
+        app,
+        &[&show, &hide, &refresh, &start, &stop, &restart, &quit],
+    )?;
 
     let handle = app.clone();
     let mut tray_builder = TrayIconBuilder::new()
@@ -290,26 +268,80 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     if let Some(icon) = app.default_window_icon().cloned() {
         tray_builder = tray_builder.icon(icon);
     }
-
     tray_builder.build(&handle)?;
-
     Ok(())
+}
+
+fn legacy_database_candidate() -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("HYPRTRACK_LEGACY_DB").map(PathBuf::from) {
+        return path.is_file().then_some(path);
+    }
+    let roots = [
+        std::env::current_dir().ok(),
+        std::env::current_exe()
+            .ok()
+            .and_then(|path| path.parent().map(Path::to_path_buf)),
+    ];
+    roots
+        .into_iter()
+        .flatten()
+        .flat_map(|root| {
+            root.ancestors()
+                .map(|ancestor| ancestor.join("collector/hyprtrack.db"))
+                .collect::<Vec<_>>()
+        })
+        .find(|path| path.is_file())
+}
+
+fn configure_first_run_autostart(app: &AppHandle, app_data_dir: &Path) -> Result<(), String> {
+    let marker = app_data_dir.join(".autostart-initialized");
+    if marker.exists() {
+        return Ok(());
+    }
+    app.autolaunch()
+        .enable()
+        .map_err(|error| error.to_string())?;
+    fs::write(marker, b"enabled-on-first-launch\n").map_err(|error| error.to_string())
+}
+
+fn is_autostart_launch() -> bool {
+    std::env::args().any(|argument| argument == "--autostart")
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .manage(AppState {
-            collector: Mutex::new(None),
-        })
+    let app = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_main_window_impl(app);
+        }))
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            app.handle()
-                .plugin(tauri_plugin_autostart::init(
-                    MacosLauncher::LaunchAgent,
-                    None::<Vec<&str>>,
-                ))?;
+            app.handle().plugin(tauri_plugin_autostart::init(
+                MacosLauncher::LaunchAgent,
+                Some(vec!["--autostart"]),
+            ))?;
+            let app_data_dir = app.path().app_data_dir()?;
+            let database_path = app_data_dir.join("hyprtrack.db");
+            let migration =
+                prepare_database(&database_path, legacy_database_candidate().as_deref())
+                    .map_err(std::io::Error::other)?;
+            match migration {
+                MigrationResult::Imported { rows } => {
+                    eprintln!("HyprTrack imported {rows} legacy activity rows.");
+                }
+                MigrationResult::Created | MigrationResult::Existing => {}
+            }
+            configure_first_run_autostart(app.handle(), &app_data_dir)
+                .map_err(std::io::Error::other)?;
+            app.manage(AppState {
+                database_path,
+                collector: Mutex::new(None),
+            });
+            start_collector_impl(&app.state::<AppState>()).map_err(std::io::Error::other)?;
             build_tray(app.handle())?;
+            if is_autostart_launch() {
+                hide_main_window_impl(app.handle());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -333,6 +365,14 @@ pub fn run() {
             set_autostart,
             show_main_window,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building HyprTrack Desktop");
+
+    app.run(|app_handle, event| {
+        if matches!(event, RunEvent::Exit | RunEvent::ExitRequested { .. }) {
+            if let Some(state) = app_handle.try_state::<AppState>() {
+                let _ = stop_collector_impl(&state);
+            }
+        }
+    });
 }

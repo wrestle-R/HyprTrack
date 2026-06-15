@@ -24,13 +24,12 @@ vi.mock("@tauri-apps/api/core", () => ({
         }
       case "get_collector_status":
         return {
-          state: "stopped",
-          dbPath:
-            "/home/rdp/Desktop/code/HyprTrack/collector/hyprtrack.db",
+          state: "running_app",
+          dbPath: "/home/test/.local/share/com.hyprtrack.desktop/hyprtrack.db",
           latestSampleAt: "2026-06-14T13:37:43.221+05:30",
-          pid: null,
-          managedByApp: false,
-          message: "Collector is not running.",
+          pid: 42,
+          managedByApp: true,
+          message: "Collector is running inside HyprTrack Desktop.",
         }
       case "get_autostart_status":
         return { enabled: false }

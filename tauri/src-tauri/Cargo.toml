@@ -1,8 +1,9 @@
 [package]
-name = "tauri"
+name = "hyprtrack-desktop"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Local Hyprland activity intelligence"
+authors = ["Russell Daniel Paul"]
+license = "MIT"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -21,8 +22,12 @@ tauri-build = { version = "2.6.2", features = [] }
 tauri = { version = "2.11.2", default-features = false, features = ["wry", "x11", "dbus", "tray-icon"] }
 tauri-plugin-opener = "2.5.4"
 tauri-plugin-autostart = "2.5.1"
+tauri-plugin-single-instance = "2.3.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.32", features = ["backup", "bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 fs2 = "0.4"
+
+[dev-dependencies]
+tempfile = "3"
