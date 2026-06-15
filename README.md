@@ -29,13 +29,13 @@ is not uploaded anywhere.
 
 ## Install On Arch Linux
 
-The current release is `v0.1.1`. Download the AppImage into a permanent
+The current release is `v0.1.2`. Download the AppImage into a permanent
 location:
 
 ```bash
 mkdir -p ~/.local/bin
 wget -O ~/.local/bin/hyprtrack-desktop.AppImage \
-  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.1/HyprTrack.Desktop_0.1.1_amd64.AppImage
+  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.2/HyprTrack.Desktop_0.1.2_amd64.AppImage
 chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
 ```
