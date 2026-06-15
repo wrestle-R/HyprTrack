@@ -7,6 +7,16 @@ activity, application, and productivity dashboards.
 
 No Python runtime, web server, account, or network service is required.
 
+## Screenshots
+
+### Light mode
+
+![HyprTrack Desktop in light mode](tauri/public/light_screenshot.png)
+
+### Dark mode
+
+![HyprTrack Desktop in dark mode](tauri/public/dark_screenshot.png)
+
 ## Requirements
 
 - x86_64 Linux
@@ -19,120 +29,90 @@ is not uploaded anywhere.
 
 ## Install From GitHub Releases
 
-Download one file from the latest GitHub Release:
+The current release is `v0.1.1`. Choose one installation method:
 
-- `*.AppImage`: portable option for most Linux distributions
-- `*.deb`: Debian, Ubuntu, and derivatives
-- `*.rpm`: Fedora, RHEL-compatible distributions, and openSUSE
+- **AppImage:** portable option for Arch Linux and other distributions
+- **Debian package:** Debian, Ubuntu, Linux Mint, Pop!_OS, and derivatives
+- **RPM package:** Fedora, RHEL-compatible distributions, and openSUSE
 
-### AppImage
+### AppImage (Arch Linux and other distributions)
+
+Download the AppImage into a permanent location:
 
 ```bash
-chmod +x HyprTrack*.AppImage
-./HyprTrack*.AppImage
+mkdir -p ~/.local/bin
+wget -O ~/.local/bin/hyprtrack-desktop.AppImage \
+  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.1/HyprTrack.Desktop_0.1.1_amd64.AppImage
+chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
+~/.local/bin/hyprtrack-desktop.AppImage
 ```
 
-Keep the AppImage in a permanent location before enabling login autostart. If
-you move it later, disable and re-enable **Launch at login** in Settings.
+The final command launches HyprTrack. Keep the AppImage at this path because
+login autostart records its location. If you move it later, launch it manually,
+disable **Launch at login** in Settings, and enable it again.
 
-### Debian or Ubuntu
+To remove the AppImage:
 
 ```bash
-sudo apt install ./HyprTrack*.deb
+rm ~/.local/bin/hyprtrack-desktop.AppImage
+```
+
+Disable **Launch at login** before removing it.
+
+### Debian, Ubuntu, Linux Mint, or Pop!_OS
+
+Download and install the Debian package:
+
+```bash
+cd /tmp
+wget https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.1/HyprTrack.Desktop_0.1.1_amd64.deb
+sudo apt install ./HyprTrack.Desktop_0.1.1_amd64.deb
+hyprtrack-desktop
+```
+
+The `apt install` command installs required package dependencies. To uninstall:
+
+```bash
+sudo apt remove hyprtrack-desktop
 ```
 
 ### Fedora
 
+Download and install the RPM package:
+
 ```bash
-sudo dnf install ./HyprTrack*.rpm
+cd /tmp
+wget https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.1/HyprTrack.Desktop-0.1.1-1.x86_64.rpm
+sudo dnf install ./HyprTrack.Desktop-0.1.1-1.x86_64.rpm
+hyprtrack-desktop
+```
+
+To uninstall:
+
+```bash
+sudo dnf remove hyprtrack-desktop
+```
+
+### openSUSE
+
+Download and install the same RPM package:
+
+```bash
+cd /tmp
+wget https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.1/HyprTrack.Desktop-0.1.1-1.x86_64.rpm
+sudo zypper install ./HyprTrack.Desktop-0.1.1-1.x86_64.rpm
+hyprtrack-desktop
+```
+
+To uninstall:
+
+```bash
+sudo zypper remove hyprtrack-desktop
 ```
 
 The first manual launch creates the local database, starts tracking, and
 enables login autostart. Later login launches start hidden in the tray. Closing
 the window hides it; use **Quit** from the tray menu to stop the application.
-
-## Data And Migration
-
-The production database is stored at:
-
-```text
-~/.local/share/com.hyprtrack.desktop/hyprtrack.db
-```
-
-On a source checkout, the first launch imports `collector/hyprtrack.db` when
-that legacy database exists and the new database does not. Import uses SQLite's
-backup API, verifies database integrity and row counts, and leaves the original
-file untouched as a backup.
-
-To override the legacy source during migration:
-
-```bash
-HYPRTRACK_LEGACY_DB=/path/to/hyprtrack.db ./HyprTrack.AppImage
-```
-
-## Local Development
-
-Install Node.js, npm, Rust, and the
-[Tauri Linux prerequisites](https://v2.tauri.app/start/prerequisites/).
-
-On Arch Linux:
-
-```bash
-sudo pacman -S --needed base-devel curl file openssl appmenu-gtk-module \
-  gtk3 libappindicator-gtk3 librsvg webkit2gtk-4.1
-cd tauri
-npm ci
-npm run tauri dev
-```
-
-Run checks:
-
-```bash
-cd tauri
-npm test
-npm run build
-cargo test --manifest-path src-tauri/Cargo.toml
-```
-
-Create and run the local production binary:
-
-```bash
-cd tauri
-npm run tauri build -- --no-bundle
-./src-tauri/target/release/hyprtrack-desktop
-```
-
-Create packages locally:
-
-```bash
-npm run tauri build -- --bundles deb,rpm
-```
-
-Bundles are written below `tauri/src-tauri/target/release/bundle/`. The official
-AppImage is built on Ubuntu by GitHub Actions. Arch's current GTK layout is not
-compatible with the older `linuxdeploy` GTK plugin used by Tauri, so local
-AppImage generation may fail even though the production binary, deb, and rpm
-build successfully.
-
-## Publishing A Release
-
-Normal pushes and pull requests run CI but never publish installers. A release
-is created only when a strict semantic-version tag is pushed:
-
-```bash
-git switch main
-git pull
-git tag -a v0.1.0 -m "HyprTrack Desktop v0.1.0"
-git push origin v0.1.0
-```
-
-GitHub Actions derives version `0.1.0` from the tag, runs tests, builds the
-x86_64 AppImage, deb, and rpm packages, generates `SHA256SUMS`, and publishes
-the GitHub Release. GitHub also adds source ZIP and tar.gz archives.
-
-If the workflow fails, no public release is published. Fix the tagged commit,
-delete the failed tag locally and remotely, then create the tag again, or use a
-new patch version.
 
 ## Uninstall
 
@@ -152,8 +132,6 @@ history and preferences.
 
 - No new activity: verify `hyprctl activewindow -j` works in the same session.
 - App starts but has no tray icon: enable a StatusNotifier-compatible tray.
-- Old Python collector still runs: remove its Hyprland startup command and log
-  in again before using the standalone collector.
 - AppImage autostart breaks after moving it: launch it manually, disable
   **Launch at login**, then enable it again.
 
