@@ -1,9 +1,9 @@
 # HyprTrack Desktop
 
-HyprTrack is a standalone Linux desktop application for local Hyprland activity
-tracking. The Tauri application listens to Hyprland window events, stores timed
-activity intervals in a private SQLite database, and presents overview,
-activity, application, and productivity dashboards.
+HyprTrack is a standalone Arch Linux desktop application for local Hyprland
+activity tracking. The Tauri application listens to Hyprland window events,
+stores timed activity intervals in a private SQLite database, and presents
+overview, activity, application, and productivity dashboards.
 
 No Python runtime, web server, account, or network service is required.
 
@@ -17,27 +17,20 @@ No Python runtime, web server, account, or network service is required.
 
 ![HyprTrack Desktop in dark mode](tauri/public/dark_screenshot.png)
 
-## Requirements
+## Supported Platform
 
-- x86_64 Linux
-- Hyprland with `hyprctl`
+- x86_64 Arch Linux
+- Hyprland with a working `hyprctl`
 - A working system tray/status notifier
-- WebKitGTK and GTK runtime libraries supplied by your distribution
+- WebKitGTK and GTK runtime libraries
 
 HyprTrack records application classes and window titles locally. The database
 is not uploaded anywhere.
 
-## Install From GitHub Releases
+## Install On Arch Linux
 
-The current release is `v0.1.1`. Choose one installation method:
-
-- **AppImage:** portable option for Arch Linux and other distributions
-- **Debian package:** Debian, Ubuntu, Linux Mint, Pop!_OS, and derivatives
-- **RPM package:** Fedora, RHEL-compatible distributions, and openSUSE
-
-### AppImage (Arch Linux and other distributions)
-
-Download the AppImage into a permanent location:
+The current release is `v0.1.1`. Download the AppImage into a permanent
+location:
 
 ```bash
 mkdir -p ~/.local/bin
@@ -59,65 +52,18 @@ rm ~/.local/bin/hyprtrack-desktop.AppImage
 
 Disable **Launch at login** before removing it.
 
-### Debian, Ubuntu, Linux Mint, or Pop!_OS
-
-Download and install the Debian package:
-
-```bash
-cd /tmp
-wget https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.1/HyprTrack.Desktop_0.1.1_amd64.deb
-sudo apt install ./HyprTrack.Desktop_0.1.1_amd64.deb
-hyprtrack-desktop
-```
-
-The `apt install` command installs required package dependencies. To uninstall:
-
-```bash
-sudo apt remove hyprtrack-desktop
-```
-
-### Fedora
-
-Download and install the RPM package:
-
-```bash
-cd /tmp
-wget https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.1/HyprTrack.Desktop-0.1.1-1.x86_64.rpm
-sudo dnf install ./HyprTrack.Desktop-0.1.1-1.x86_64.rpm
-hyprtrack-desktop
-```
-
-To uninstall:
-
-```bash
-sudo dnf remove hyprtrack-desktop
-```
-
-### openSUSE
-
-Download and install the same RPM package:
-
-```bash
-cd /tmp
-wget https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.1/HyprTrack.Desktop-0.1.1-1.x86_64.rpm
-sudo zypper install ./HyprTrack.Desktop-0.1.1-1.x86_64.rpm
-hyprtrack-desktop
-```
-
-To uninstall:
-
-```bash
-sudo zypper remove hyprtrack-desktop
-```
-
 The first manual launch creates the local database, starts tracking, and
 enables login autostart. Later login launches start hidden in the tray. Closing
 the window hides it; use **Quit** from the tray menu to stop the application.
 
 ## Uninstall
 
-Remove the installed package using your package manager. AppImage users can
-delete the AppImage after disabling **Launch at login**.
+Disable **Launch at login**, quit HyprTrack from its tray menu, and remove the
+AppImage:
+
+```bash
+rm ~/.local/bin/hyprtrack-desktop.AppImage
+```
 
 Application data remains in:
 
