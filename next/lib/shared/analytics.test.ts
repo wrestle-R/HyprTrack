@@ -158,4 +158,89 @@ describe("shared dashboard analytics", () => {
       database.close()
     }
   })
+
+  it("normalizes desktop app and plain browser conversation labels at read time", () => {
+    const database = new Database(databasePath)
+    database
+      .prepare(
+        `
+          INSERT INTO activity_samples (
+            sampled_at,
+            app_class,
+            window_title,
+            window_full
+          ) VALUES (?, ?, ?, ?)
+        `
+      )
+      .run(
+        "2026-06-14T09:05:00+05:30",
+        "tauri",
+        "tauri",
+        "tauri"
+      )
+    database
+      .prepare(
+        `
+          INSERT INTO activity_samples (
+            sampled_at,
+            app_class,
+            window_title,
+            window_full
+          ) VALUES (?, ?, ?, ?)
+        `
+      )
+      .run(
+        "2026-06-14T09:06:00+05:30",
+        "zen",
+        "Hyprland Desktop App Frameworks",
+        "Hyprland Desktop App Frameworks — Zen Browser"
+      )
+    database
+      .prepare(
+        `
+          INSERT INTO activity_samples (
+            sampled_at,
+            app_class,
+            window_title,
+            window_full
+          ) VALUES (?, ?, ?, ?)
+        `
+      )
+      .run(
+        "2026-06-14T09:07:00+05:30",
+        "zen",
+        '(4) Bilal on X: "Thread title"',
+        '(4) Bilal on X: "Thread title" — Zen Browser'
+      )
+    database.close()
+
+    const readonlyDatabase = openBetterSqliteDatabase(databasePath)
+    try {
+      const applications = readApplications({
+        database: readonlyDatabase,
+        range: "today",
+        search: "",
+        now: new Date("2026-06-14T06:00:00.000Z"),
+      })
+
+      expect(applications.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            windowTitle: "HyprTrack Desktop App",
+            appClass: "HyprTrack Desktop App",
+          }),
+          expect.objectContaining({
+            windowTitle: "ChatGPT",
+            appClass: "zen",
+          }),
+          expect.objectContaining({
+            windowTitle: "X",
+            appClass: "zen",
+          }),
+        ])
+      )
+    } finally {
+      readonlyDatabase.close()
+    }
+  })
 })

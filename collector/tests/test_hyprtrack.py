@@ -422,6 +422,32 @@ class HyprTrackTests(unittest.TestCase):
                     expected,
                 )
 
+    def test_zen_recognizes_x_titles(self):
+        hyprtrack = load_hyprtrack()
+
+        cases = {
+            "X — Zen Browser": "X",
+            '(4) Bilal on X: "Thread title" — Zen Browser': "X",
+        }
+
+        for title, expected in cases.items():
+            with self.subTest(title=title):
+                self.assertEqual(
+                    hyprtrack.normalize_window_title("zen", title),
+                    expected,
+                )
+
+    def test_zen_treats_plain_conversation_titles_as_chatgpt(self):
+        hyprtrack = load_hyprtrack()
+
+        self.assertEqual(
+            hyprtrack.normalize_window_title(
+                "zen",
+                "Hyprland Desktop App Frameworks — Zen Browser",
+            ),
+            "ChatGPT",
+        )
+
     def test_zen_recognizes_github_repository_titles(self):
         hyprtrack = load_hyprtrack()
 
@@ -516,6 +542,14 @@ class HyprTrackTests(unittest.TestCase):
                 "Stremio - Freedom to Stream",
             ),
             "Stremio",
+        )
+
+        self.assertEqual(
+            hyprtrack.normalize_window_title(
+                "tauri",
+                "tauri",
+            ),
+            "HyprTrack Desktop App",
         )
 
     def test_record_sample_skips_insert_when_hyprctl_fails(self):

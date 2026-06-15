@@ -1,6 +1,18 @@
 import { render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
+vi.mock("recharts", async () => {
+  const actual = await vi.importActual<typeof import("recharts")>("recharts")
+  return {
+    ...actual,
+    ResponsiveContainer: ({
+      children,
+    }: {
+      children: React.ReactNode
+    }) => <div style={{ width: 640, height: 320 }}>{children}</div>,
+  }
+})
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (command: string) => {
     switch (command) {
@@ -90,13 +102,15 @@ describe("App", () => {
   it("renders the desktop dashboard shell instead of the starter greet screen", async () => {
     render(<App />)
 
-    expect(await screen.findByText("HyprTrack")).toBeInTheDocument()
+    expect(await screen.findByRole("heading", { name: "Overview" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Activity" })).toBeInTheDocument()
     expect(
       screen.getByRole("button", { name: "Applications" })
     ).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument()
+    expect(screen.getByText("Auto 1m")).toBeInTheDocument()
+    expect(screen.getByLabelText("Use dark theme")).toBeInTheDocument()
     expect(
       screen.queryByText("Welcome to Tauri + React")
     ).not.toBeInTheDocument()

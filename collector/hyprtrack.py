@@ -30,6 +30,7 @@ APP_LABELS = {
     "visual studio code": "VS Code",
     "kitty": "Terminal",
     "com.stremio.stremio": "Stremio",
+    "tauri": "HyprTrack Desktop App",
 }
 ZEN_SERVICES = {
     "chatgpt": "ChatGPT",
@@ -38,6 +39,7 @@ ZEN_SERVICES = {
     "leetcode": "LeetCode",
     "vercel": "Vercel",
     "whatsapp": "WhatsApp",
+    "x.com": "X",
     "youtube": "YouTube",
 }
 GITHUB_REPOSITORY_TITLE = re.compile(
@@ -59,6 +61,18 @@ BROWSER_SUFFIXES = {
     "brave-origin-nightly": (" - Brave Origin",),
 }
 BROWSER_CLASSES = frozenset(BROWSER_SUFFIXES)
+
+
+def is_probable_chatgpt_conversation_title(title: str) -> bool:
+    stripped = title.strip()
+    return (
+        bool(stripped)
+        and not stripped.startswith("(")
+        and " - " not in stripped
+        and " | " not in stripped
+        and " · " not in stripped
+        and len(stripped.split()) >= 3
+    )
 
 
 @dataclass(frozen=True)
@@ -253,6 +267,14 @@ def normalize_window_title(app_class: str, window_title: str) -> str:
     if folded_title in PERSONAL_WEBSITE_TITLES:
         return "Personal Websites"
 
+    if (
+        folded_title == "x"
+        or folded_title.startswith("x ")
+        or folded_title.endswith(" on x:")
+        or " on x: " in folded_title
+    ):
+        return "X"
+
     for marker, label in ZEN_SERVICES.items():
         if marker in folded_title:
             return label
@@ -266,6 +288,9 @@ def normalize_window_title(app_class: str, window_title: str) -> str:
         service = title_without_browser.rsplit(" - ", 1)[1].strip()
         if service:
             return service
+
+    if is_probable_chatgpt_conversation_title(title_without_browser):
+        return "ChatGPT"
 
     return title_without_browser or "Zen"
 

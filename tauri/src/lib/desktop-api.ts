@@ -24,7 +24,7 @@ export function getActivity(args: {
   return invoke<ActivityData>("get_activity", {
     range: args.range,
     page: args.page,
-    page_size: args.pageSize,
+    pageSize: args.pageSize,
     app: args.app ?? null,
     search: args.search ?? null,
   })

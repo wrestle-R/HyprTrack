@@ -1,19 +1,34 @@
 import * as React from "react"
+import {
+  Activity01Icon,
+  Analytics01Icon,
+  Home01Icon,
+  Moon02Icon,
+  RefreshIcon,
+  Settings01Icon,
+  Sun03Icon,
+} from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
 import { listen } from "@tauri-apps/api/event"
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts"
 
 import "./App.css"
+import { HyprTrackMark } from "./components/hyprtrack-mark"
+import { useDesktopQuery } from "./hooks/use-desktop-query"
 import {
   getActivity,
   getApplications,
   getAutostartStatus,
-  getCollectorStatus,
-  getHealth,
   getOverview,
-  restartCollector,
   setAutostart,
-  startCollector,
-  stopCollector,
 } from "./lib/desktop-api"
 import {
   getApplicationSource,
@@ -22,7 +37,6 @@ import {
 } from "./lib/application-source"
 import {
   calculateProductiveMinutes,
-  formatDate,
   formatDuration,
   formatTimestamp,
 } from "./lib/format"
@@ -38,19 +52,22 @@ import {
 import type {
   ActivityData,
   ApplicationsData,
-  CollectorStatus,
   DesktopPage,
-  HealthData,
   OverviewData,
   RangeKey,
 } from "./lib/types"
-import { useDesktopQuery } from "./hooks/use-desktop-query"
 
-const PAGES: Array<{ id: DesktopPage; label: string; description: string }> = [
-  { id: "overview", label: "Overview", description: "Daily focus at a glance" },
-  { id: "activity", label: "Activity", description: "Browse grouped sessions" },
-  { id: "applications", label: "Applications", description: "Compare usage" },
-  { id: "settings", label: "Settings", description: "Appearance and tracking" },
+const AUTO_REFRESH_INTERVAL_MS = 60_000
+
+const PAGES: Array<{
+  id: DesktopPage
+  label: string
+  icon: typeof Home01Icon
+}> = [
+  { id: "overview", label: "Overview", icon: Home01Icon },
+  { id: "activity", label: "Activity", icon: Activity01Icon },
+  { id: "applications", label: "Applications", icon: Analytics01Icon },
+  { id: "settings", label: "Settings", icon: Settings01Icon },
 ]
 
 function useDesktopPreferences() {
@@ -136,6 +153,86 @@ function Metric({
   )
 }
 
+function RangeControl({
+  range,
+  onChange,
+}: {
+  range: RangeKey
+  onChange: (range: RangeKey) => void
+}) {
+  return (
+    <div className="segmented-control" aria-label="Dashboard date range">
+      {(["today", "7d", "30d"] as const).map((option) => (
+        <button
+          key={option}
+          className={range === option ? "active" : ""}
+          type="button"
+          onClick={() => onChange(option)}
+        >
+          {option === "today" ? "Today" : option === "7d" ? "7 days" : "30 days"}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function AutoRefreshControl({
+  enabled,
+  onChange,
+}: {
+  enabled: boolean
+  onChange: (enabled: boolean) => void
+}) {
+  const labelId = React.useId()
+
+  return (
+    <div className="auto-refresh-control">
+      <span id={labelId}>
+        <span aria-hidden="true" className="auto-refresh-label">
+          Auto 1m
+        </span>
+        <span className="sr-only">Refresh dashboard every minute</span>
+      </span>
+      <label className="switch compact">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(event) => onChange(event.currentTarget.checked)}
+          aria-labelledby={labelId}
+        />
+        <span />
+      </label>
+    </div>
+  )
+}
+
+function ThemeIconToggle({
+  isDark,
+  onToggle,
+}: {
+  isDark: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      className="button icon-button theme-icon-button"
+      type="button"
+      aria-label={isDark ? "Use light theme" : "Use dark theme"}
+      onClick={onToggle}
+      title={isDark ? "Use light theme" : "Use dark theme"}
+    >
+      <span className="theme-icon-frame">
+        <HugeiconsIcon
+          key={isDark ? "sun" : "moon"}
+          icon={isDark ? Sun03Icon : Moon02Icon}
+          strokeWidth={1.8}
+          className="theme-icon"
+        />
+      </span>
+    </button>
+  )
+}
+
 function OverviewPage({
   range,
   refreshVersion,
@@ -151,7 +248,12 @@ function OverviewPage({
   )
 
   if (query.loading && !query.data) {
-    return <EmptyState title="Loading overview" description="Reading local activity analytics." />
+    return (
+      <EmptyState
+        title="Loading overview"
+        description="Reading local activity analytics."
+      />
+    )
   }
   if (query.error && !query.data) {
     return <ErrorState message={query.error} />
@@ -177,7 +279,8 @@ function OverviewPage({
           <p className="eyebrow">{query.data.range.label}</p>
           <h1>Local activity intelligence</h1>
           <p className="hero-copy">
-            Read-only analytics from your HyprTrack collector with a denser desktop shell.
+            Read-only analytics from your HyprTrack collector with the same
+            dashboard language as the web app.
           </p>
         </div>
         <div className="hero-meta">
@@ -199,7 +302,9 @@ function OverviewPage({
         <Metric
           label="Productive time"
           value={formatDuration(productiveMinutes)}
-          detail={`${Math.round((productiveMinutes / query.data.trackedMinutes) * 100)}% of tracked time`}
+          detail={`${Math.round(
+            (productiveMinutes / query.data.trackedMinutes) * 100
+          )}% of tracked time`}
         />
         <Metric
           label="Top application"
@@ -212,7 +317,9 @@ function OverviewPage({
         />
         <Metric
           label="Active streak"
-          value={`${query.data.streakDays} ${query.data.streakDays === 1 ? "day" : "days"}`}
+          value={`${query.data.streakDays} ${
+            query.data.streakDays === 1 ? "day" : "days"
+          }`}
           detail="Consecutive days with tracked activity"
         />
       </section>
@@ -226,15 +333,41 @@ function OverviewPage({
         </div>
         <div className="chart-frame">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={query.data.timeline} margin={{ top: 16, right: 8, left: -24, bottom: 0 }}>
+            <AreaChart
+              data={query.data.timeline}
+              margin={{ top: 16, right: 8, left: -24, bottom: 0 }}
+            >
               <defs>
-                <linearGradient id="hyprtrackArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--chart-3)" stopOpacity={0.34} />
-                  <stop offset="95%" stopColor="var(--chart-3)" stopOpacity={0.03} />
+                <linearGradient
+                  id="hyprtrackArea"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="5%"
+                    stopColor="var(--chart-3)"
+                    stopOpacity={0.34}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="var(--chart-3)"
+                    stopOpacity={0.03}
+                  />
                 </linearGradient>
               </defs>
-              <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={32} />
+              <CartesianGrid
+                vertical={false}
+                stroke="var(--border)"
+                strokeDasharray="3 3"
+              />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                minTickGap={32}
+              />
               <YAxis tickLine={false} axisLine={false} width={32} />
               <Tooltip
                 contentStyle={{
@@ -265,8 +398,13 @@ function OverviewPage({
           </div>
           <div className="stack-list">
             {query.data.applications.slice(0, 6).map((application, index) => (
-              <div key={`${application.appClass}-${application.windowTitle}`} className="usage-row">
-                <span className="usage-rank">{String(index + 1).padStart(2, "0")}</span>
+              <div
+                key={`${application.appClass}-${application.windowTitle}`}
+                className="usage-row"
+              >
+                <span className="usage-rank">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
                 <div className="usage-main">
                   <div className="usage-row-header">
                     <strong>{application.windowTitle}</strong>
@@ -303,7 +441,9 @@ function OverviewPage({
             </thead>
             <tbody>
               {query.data.recentSessions.map((session) => (
-                <tr key={`${session.startAt}-${session.appClass}-${session.windowTitle}`}>
+                <tr
+                  key={`${session.startAt}-${session.appClass}-${session.windowTitle}`}
+                >
                   <td>{session.windowTitle}</td>
                   <td>{session.appClass}</td>
                   <td>{formatTimestamp(session.startAt, true)}</td>
@@ -357,7 +497,12 @@ function ActivityPage({
   }, [filterKey])
 
   if (query.loading && !query.data) {
-    return <EmptyState title="Loading activity" description="Grouping tracked sessions." />
+    return (
+      <EmptyState
+        title="Loading activity"
+        description="Grouping tracked sessions."
+      />
+    )
   }
   if (query.error && !query.data) {
     return <ErrorState message={query.error} />
@@ -374,7 +519,7 @@ function ActivityPage({
         <div className="panel-header">
           <div>
             <h2>Activity</h2>
-            <p>Inspect grouped focus sessions without exposing full raw titles.</p>
+            <p>Inspect grouped focus sessions without exposing raw database rows.</p>
           </div>
           <span className="pill">{query.data.range.label}</span>
         </div>
@@ -424,11 +569,13 @@ function ActivityPage({
             </thead>
             <tbody>
               {query.data.sessions.map((session) => (
-                <tr key={`${session.startAt}-${session.appClass}-${session.windowTitle}`}>
+                <tr
+                  key={`${session.startAt}-${session.appClass}-${session.windowTitle}`}
+                >
                   <td>{session.windowTitle}</td>
                   <td>{session.appClass}</td>
                   <td>{formatTimestamp(session.startAt, true)}</td>
-                  <td>{formatTimestamp(session.endAt)}</td>
+                  <td>{formatTimestamp(session.endAt, true)}</td>
                   <td>{formatDuration(session.durationMinutes)}</td>
                   <td>{session.sampleCount}</td>
                 </tr>
@@ -440,7 +587,8 @@ function ActivityPage({
 
       <div className="pager">
         <span>
-          Page {query.data.pagination.page} of {query.data.pagination.totalPages}
+          Page {query.data.pagination.page} of{" "}
+          {query.data.pagination.totalPages}
         </span>
         <div className="pager-actions">
           <button
@@ -484,14 +632,18 @@ function ApplicationsPage({
 }) {
   const [search, setSearch] = React.useState("")
   const deferredSearch = React.useDeferredValue(search)
-  const [selected, setSelected] = React.useState<string | null>(null)
   const query = useDesktopQuery<ApplicationsData>(
     () => getApplications(range, deferredSearch || undefined),
     [range, deferredSearch, refreshVersion]
   )
 
   if (query.loading && !query.data) {
-    return <EmptyState title="Loading applications" description="Ranking normalized labels." />
+    return (
+      <EmptyState
+        title="Loading applications"
+        description="Ranking normalized labels."
+      />
+    )
   }
   if (query.error && !query.data) {
     return <ErrorState message={query.error} />
@@ -499,11 +651,6 @@ function ApplicationsPage({
   if (!query.data) {
     return null
   }
-
-  const application =
-    query.data.items.find(
-      (item) => `${item.appClass}\u0000${item.windowTitle}` === selected
-    ) ?? null
 
   return (
     <div className="page-stack">
@@ -529,112 +676,38 @@ function ApplicationsPage({
         </div>
       </section>
 
-      <section className="details-layout">
-        <div className="panel">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Rank</th>
-                <th>Application</th>
-                <th>Class</th>
-                <th>Usage</th>
-                <th>Sessions</th>
-                <th>Last active</th>
-                <th />
+      <section className="panel full-width-panel">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Application</th>
+              <th>Class</th>
+              <th>Usage</th>
+              <th>Sessions</th>
+              <th>Last active</th>
+            </tr>
+          </thead>
+          <tbody>
+            {query.data.items.map((item, index) => (
+              <tr key={`${item.appClass}-${item.windowTitle}`}>
+                <td>{String(index + 1).padStart(2, "0")}</td>
+                <td>
+                  <strong>{item.windowTitle}</strong>
+                  <div className="usage-bar inline">
+                    <div style={{ width: `${item.share}%` }} />
+                  </div>
+                </td>
+                <td>{item.appClass}</td>
+                <td>
+                  {formatDuration(item.minutes)} · {item.share}%
+                </td>
+                <td>{item.sessionCount}</td>
+                <td>{formatTimestamp(item.lastSeen, true)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {query.data.items.map((item, index) => (
-                <tr key={`${item.appClass}-${item.windowTitle}`}>
-                  <td>{String(index + 1).padStart(2, "0")}</td>
-                  <td>
-                    <strong>{item.windowTitle}</strong>
-                    <div className="usage-bar inline">
-                      <div style={{ width: `${item.share}%` }} />
-                    </div>
-                  </td>
-                  <td>{item.appClass}</td>
-                  <td>
-                    {formatDuration(item.minutes)} · {item.share}%
-                  </td>
-                  <td>{item.sessionCount}</td>
-                  <td>{formatTimestamp(item.lastSeen, true)}</td>
-                  <td>
-                    <button
-                      className="button ghost"
-                      type="button"
-                      onClick={() => setSelected(`${item.appClass}\u0000${item.windowTitle}`)}
-                    >
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <aside className="panel inspector-panel">
-          {application ? (
-            <>
-              <div className="panel-header">
-                <div>
-                  <h2>{application.windowTitle}</h2>
-                  <p>Usage details derived from normalized HyprTrack activity.</p>
-                </div>
-              </div>
-              <div className="stats-two-column">
-                <div>
-                  <span>Tracked</span>
-                  <strong>{formatDuration(application.minutes)}</strong>
-                </div>
-                <div>
-                  <span>Share</span>
-                  <strong>{application.share}%</strong>
-                </div>
-                <div>
-                  <span>Sessions</span>
-                  <strong>{application.sessionCount}</strong>
-                </div>
-                <div>
-                  <span>Class</span>
-                  <strong>{application.appClass}</strong>
-                </div>
-              </div>
-              <div className="inspector-section">
-                <h3>Visibility</h3>
-                <p>
-                  First seen {formatDate(application.firstSeen)}. Last active{" "}
-                  {formatTimestamp(application.lastSeen, true)}.
-                </p>
-              </div>
-              <div className="inspector-section">
-                <h3>Recent sessions</h3>
-                {application.recentSessions.length === 0 ? (
-                  <p>No sessions in this range.</p>
-                ) : (
-                  application.recentSessions.map((session) => (
-                    <div key={session.startAt} className="session-blip">
-                      <div>
-                        <strong>{formatTimestamp(session.startAt, true)}</strong>
-                        <span>
-                          {session.sampleCount}{" "}
-                          {session.sampleCount === 1 ? "interval" : "intervals"}
-                        </span>
-                      </div>
-                      <em>{formatDuration(session.durationMinutes)}</em>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          ) : (
-            <EmptyState
-              title="Select an application"
-              description="Pick a row to inspect usage details and recent sessions."
-            />
-          )}
-        </aside>
+            ))}
+          </tbody>
+        </table>
       </section>
     </div>
   )
@@ -643,11 +716,8 @@ function ApplicationsPage({
 function SettingsPage({
   preferences,
   updatePreferences,
-  collectorStatus,
-  health,
   autostartEnabled,
   onToggleAutostart,
-  onCollectorAction,
 }: {
   preferences: DesktopPreferences
   updatePreferences: (
@@ -655,11 +725,8 @@ function SettingsPage({
       | Partial<DesktopPreferences>
       | ((current: DesktopPreferences) => DesktopPreferences)
   ) => void
-  collectorStatus: CollectorStatus | null
-  health: HealthData | null
   autostartEnabled: boolean
   onToggleAutostart: (enabled: boolean) => void
-  onCollectorAction: (action: "start" | "stop" | "restart") => void
 }) {
   const [applicationSource, setApplicationSource] =
     React.useState<ApplicationSource>("app")
@@ -770,84 +837,20 @@ function SettingsPage({
         </div>
       </section>
 
-      <section className="split-grid">
-        <div className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Tracker control</h2>
-              <p>Native collector actions stay separate from database reads.</p>
-            </div>
+      <section className="panel">
+        <div className="toggle-row settings-toggle-row">
+          <div>
+            <strong>Launch at login</strong>
+            <p>Linux autostart for the desktop shell.</p>
           </div>
-          <div className="stack-list">
-            <div className="status-tile">
-              <span>Collector state</span>
-              <strong>{collectorStatus?.message ?? "Checking collector…"}</strong>
-            </div>
-            <div className="status-tile">
-              <span>Database path</span>
-              <strong>{collectorStatus?.dbPath ?? "Unavailable"}</strong>
-            </div>
-            <div className="status-tile">
-              <span>Latest activity</span>
-              <strong>
-                {collectorStatus?.latestSampleAt
-                  ? formatTimestamp(collectorStatus.latestSampleAt, true)
-                  : "Unavailable"}
-              </strong>
-            </div>
-            <div className="toggle-row">
-              <div>
-                <strong>Launch at login</strong>
-                <p>Linux autostart for this desktop shell.</p>
-              </div>
-              <label className="switch">
-                <input
-                  type="checkbox"
-                  checked={autostartEnabled}
-                  onChange={(event) => onToggleAutostart(event.currentTarget.checked)}
-                />
-                <span />
-              </label>
-            </div>
-            <div className="button-row">
-              <button className="button primary" type="button" onClick={() => onCollectorAction("start")}>
-                Start collector
-              </button>
-              <button className="button secondary" type="button" onClick={() => onCollectorAction("stop")}>
-                Stop collector
-              </button>
-              <button className="button secondary" type="button" onClick={() => onCollectorAction("restart")}>
-                Restart collector
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Desktop health</h2>
-              <p>Read-only visibility into the local analytics store.</p>
-            </div>
-          </div>
-          <div className="stack-list">
-            <div className="status-tile">
-              <span>Sample count</span>
-              <strong>{health?.sampleCount ?? "Unavailable"}</strong>
-            </div>
-            <div className="status-tile">
-              <span>Latest sample</span>
-              <strong>
-                {health?.latestSampleAt
-                  ? formatTimestamp(health.latestSampleAt, true)
-                  : "Unavailable"}
-              </strong>
-            </div>
-            <div className="status-tile">
-              <span>Connection</span>
-              <strong>{health?.status ?? "Unavailable"}</strong>
-            </div>
-          </div>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={autostartEnabled}
+              onChange={(event) => onToggleAutostart(event.currentTarget.checked)}
+            />
+            <span />
+          </label>
         </div>
       </section>
 
@@ -860,14 +863,18 @@ function SettingsPage({
         </div>
         <div className="toggle-grid source-grid">
           <button
-            className={`button ${applicationSource === "app" ? "primary" : "secondary"}`}
+            className={`button ${
+              applicationSource === "app" ? "primary" : "secondary"
+            }`}
             type="button"
             onClick={() => setApplicationSource("app")}
           >
             Apps
           </button>
           <button
-            className={`button ${applicationSource === "browser" ? "primary" : "secondary"}`}
+            className={`button ${
+              applicationSource === "browser" ? "primary" : "secondary"
+            }`}
             type="button"
             onClick={() => setApplicationSource("browser")}
           >
@@ -876,7 +883,9 @@ function SettingsPage({
         </div>
         <div className="toggle-list">
           {visibleApplications.map((application) => {
-            const checked = preferences.productiveTitles.includes(application.windowTitle)
+            const checked = preferences.productiveTitles.includes(
+              application.windowTitle
+            )
             return (
               <div
                 key={`${application.appClass}-${application.windowTitle}`}
@@ -895,9 +904,15 @@ function SettingsPage({
                       updatePreferences((current) => ({
                         ...current,
                         productiveTitles: nextChecked
-                          ? [...new Set([...current.productiveTitles, application.windowTitle])]
+                          ? [
+                              ...new Set([
+                                ...current.productiveTitles,
+                                application.windowTitle,
+                              ]),
+                            ]
                           : current.productiveTitles.filter(
-                              (candidate) => candidate !== application.windowTitle
+                              (candidate) =>
+                                candidate !== application.windowTitle
                             ),
                       }))
                     }}
@@ -918,15 +933,13 @@ function App() {
   const [page, setPage] = React.useState<DesktopPage>("overview")
   const [rangeOverride, setRangeOverride] = React.useState<RangeKey | null>(null)
   const [refreshVersion, setRefreshVersion] = React.useState(0)
+  const [refreshRequestedAt, setRefreshRequestedAt] =
+    React.useState<Date | null>(null)
   const [autostartEnabled, setAutostartEnabled] = React.useState(false)
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = React.useState(false)
   const range = rangeOverride ?? preferences.defaultRange
   const resolvedTheme = useResolvedTheme(preferences.theme)
 
-  const health = useDesktopQuery<HealthData>(() => getHealth(), [refreshVersion])
-  const collectorStatus = useDesktopQuery<CollectorStatus>(
-    () => getCollectorStatus(),
-    [refreshVersion]
-  )
   const autostart = useDesktopQuery(() => getAutostartStatus(), [refreshVersion])
 
   React.useEffect(() => {
@@ -948,45 +961,49 @@ function App() {
     }
   }, [preferences.fontSize, preferences.sidebarWidth, resolvedTheme])
 
+  const requestRefresh = React.useCallback(() => {
+    setRefreshRequestedAt(new Date())
+    setRefreshVersion((version) => version + 1)
+  }, [])
+
   React.useEffect(() => {
     let unlisten: (() => void) | undefined
     void listen("hyprtrack://refresh", () => {
-      setRefreshVersion((version) => version + 1)
+      requestRefresh()
     }).then((cleanup) => {
       unlisten = cleanup
     })
     return () => {
       unlisten?.()
     }
-  }, [])
+  }, [requestRefresh])
 
-  async function runCollectorAction(action: "start" | "stop" | "restart") {
-    if (action === "start") {
-      await startCollector()
-    } else if (action === "stop") {
-      await stopCollector()
-    } else {
-      await restartCollector()
+  React.useEffect(() => {
+    if (!autoRefreshEnabled || page === "settings") {
+      return
     }
-    setRefreshVersion((version) => version + 1)
-  }
+
+    const interval = window.setInterval(requestRefresh, AUTO_REFRESH_INTERVAL_MS)
+    return () => window.clearInterval(interval)
+  }, [autoRefreshEnabled, page, requestRefresh])
 
   async function toggleAutostart(enabled: boolean) {
     const next = await setAutostart(enabled)
     setAutostartEnabled(next.enabled)
   }
 
+  const pageTitle = PAGES.find((item) => item.id === page)?.label ?? "HyprTrack"
+
   return (
     <div className="desktop-shell">
       <aside className="sidebar">
         <div className="brand-block">
-          <span className="brand-mark">HT</span>
+          <HyprTrackMark className="brand-mark" title="HyprTrack" />
           <div>
             <strong>HyprTrack</strong>
-            <p>Local activity intelligence</p>
           </div>
         </div>
-        <nav className="nav-stack">
+        <nav className="nav-stack" aria-label="Desktop navigation">
           {PAGES.map((item) => (
             <button
               key={item.id}
@@ -995,100 +1012,53 @@ function App() {
               onClick={() => setPage(item.id)}
               aria-label={item.label}
             >
+              <HugeiconsIcon icon={item.icon} strokeWidth={1.8} />
               <strong>{item.label}</strong>
-              <span>{item.description}</span>
             </button>
           ))}
         </nav>
-        <div className="sidebar-footer">
-          <div className="status-dot-row">
-            <span
-              className={`status-dot ${
-                collectorStatus.data?.state === "running_app" ||
-                collectorStatus.data?.state === "running_external"
-                  ? "online"
-                  : "offline"
-              }`}
-            />
-            <div>
-              <strong>
-                {collectorStatus.data?.state === "running_app" ||
-                collectorStatus.data?.state === "running_external"
-                  ? "Tracking data ready"
-                  : "Tracker idle"}
-              </strong>
-              <p>Read-only local SQLite</p>
-            </div>
-          </div>
-          {collectorStatus.data?.latestSampleAt ? (
-            <small>
-              Latest activity {formatTimestamp(collectorStatus.data.latestSampleAt)}
-            </small>
-          ) : null}
-        </div>
       </aside>
 
       <main className="workspace">
         <header className="topbar">
-          <div>
-            <p className="eyebrow">{PAGES.find((item) => item.id === page)?.description}</p>
-            <h2>{PAGES.find((item) => item.id === page)?.label}</h2>
-          </div>
+          <h2>{pageTitle}</h2>
           <div className="topbar-actions">
             {page === "settings" ? null : (
-              <div className="segmented-control">
-                {(["today", "7d", "30d"] as const).map((option) => (
-                  <button
-                    key={option}
-                    className={range === option ? "active" : ""}
-                    type="button"
-                    onClick={() => setRangeOverride(option)}
-                  >
-                    {option === "today" ? "Today" : option}
-                  </button>
-                ))}
-              </div>
+              <>
+                <RangeControl range={range} onChange={setRangeOverride} />
+                <AutoRefreshControl
+                  enabled={autoRefreshEnabled}
+                  onChange={setAutoRefreshEnabled}
+                />
+              </>
             )}
             <button
-              className="button secondary"
+              className="button secondary header-button"
               type="button"
-              onClick={() => setRefreshVersion((version) => version + 1)}
-            >
-              Refresh
-            </button>
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() =>
-                updatePreferences({
-                  theme:
-                    preferences.theme === "dark"
-                      ? "light"
-                      : preferences.theme === "light"
-                        ? "system"
-                        : "dark",
-                })
+              onClick={requestRefresh}
+              title={
+                refreshRequestedAt
+                  ? `Last requested ${refreshRequestedAt.toLocaleTimeString()}`
+                  : "Refresh dashboard data"
               }
             >
-              Theme: {preferences.theme}
+              <HugeiconsIcon
+                icon={RefreshIcon}
+                data-icon="inline-start"
+                strokeWidth={1.8}
+              />
+              <span className="header-button-label">Refresh</span>
             </button>
+            <ThemeIconToggle
+              isDark={resolvedTheme === "dark"}
+              onToggle={() =>
+                updatePreferences({
+                  theme: resolvedTheme === "dark" ? "light" : "dark",
+                })
+              }
+            />
           </div>
         </header>
-
-        <section className="status-strip">
-          <div className="status-chip">
-            <span>Collector</span>
-            <strong>{collectorStatus.data?.message ?? "Checking…"}</strong>
-          </div>
-          <div className="status-chip">
-            <span>Samples</span>
-            <strong>{health.data?.sampleCount ?? "…"}</strong>
-          </div>
-          <div className="status-chip">
-            <span>Autostart</span>
-            <strong>{autostartEnabled ? "Enabled" : "Disabled"}</strong>
-          </div>
-        </section>
 
         <section className="content-area">
           {page === "overview" ? (
@@ -1112,11 +1082,8 @@ function App() {
             <SettingsPage
               preferences={preferences}
               updatePreferences={updatePreferences}
-              collectorStatus={collectorStatus.data}
-              health={health.data}
               autostartEnabled={autostartEnabled}
               onToggleAutostart={toggleAutostart}
-              onCollectorAction={runCollectorAction}
             />
           ) : null}
         </section>

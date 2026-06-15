@@ -22,6 +22,156 @@ struct ActivitySample {
     window_title: String,
 }
 
+fn normalize_native_app_label(class_key: &str) -> Option<&'static str> {
+    match class_key {
+        "tauri" => Some("HyprTrack Desktop App"),
+        _ => None,
+    }
+}
+
+fn browser_suffixes(class_key: &str) -> &'static [&'static str] {
+    match class_key {
+        "zen" => &[" — Zen Browser"],
+        "brave" | "brave-browser" => &[" - Brave"],
+        "brave-origin" | "brave-origin-nightly" => &[" - Brave Origin"],
+        _ => &[],
+    }
+}
+
+fn strip_browser_suffix(class_key: &str, value: &str) -> String {
+    let mut title = value.trim().to_string();
+    for suffix in browser_suffixes(class_key) {
+        if title.ends_with(suffix) {
+            title.truncate(title.len() - suffix.len());
+            title = title.trim().to_string();
+            break;
+        }
+    }
+    title
+}
+
+fn resolve_browser_source_title(class_key: &str, window_title: &str, window_full: Option<&str>) -> String {
+    let Some(full_title) = window_full.map(str::trim).filter(|value| !value.is_empty()) else {
+        return window_title.to_string();
+    };
+
+    if browser_suffixes(class_key)
+        .iter()
+        .any(|suffix| full_title.ends_with(suffix))
+    {
+        full_title.to_string()
+    } else {
+        window_title.to_string()
+    }
+}
+
+fn is_probable_chatgpt_conversation_title(title: &str) -> bool {
+    let stripped = title.trim();
+    !stripped.is_empty()
+        && !stripped.starts_with('(')
+        && !stripped.contains(" - ")
+        && !stripped.contains(" | ")
+        && !stripped.contains(" · ")
+        && stripped.split_whitespace().count() >= 3
+}
+
+fn normalize_display_labels(
+    app_class: &str,
+    window_title: &str,
+    window_full: Option<&str>,
+) -> (String, String) {
+    let class_key = app_class.trim().to_lowercase();
+    if let Some(label) = normalize_native_app_label(&class_key) {
+        let next_title = if window_title.trim().eq_ignore_ascii_case(&class_key) {
+            label.to_string()
+        } else {
+            window_title.to_string()
+        };
+        return (label.to_string(), next_title);
+    }
+
+    if browser_suffixes(&class_key).is_empty() {
+        return (app_class.to_string(), window_title.to_string());
+    }
+
+    let raw_title = strip_browser_suffix(
+        &class_key,
+        &resolve_browser_source_title(&class_key, window_title, window_full),
+    );
+    let folded_title = raw_title.to_lowercase();
+
+    if matches!(
+        folded_title.as_str(),
+        "home | blogs" | "running out of excuses" | "russel daniel paul"
+    ) {
+        return (app_class.to_string(), "Personal Websites".to_string());
+    }
+
+    if folded_title == "x"
+        || folded_title.starts_with("x ")
+        || folded_title.ends_with(" on x:")
+        || folded_title.contains(" on x: ")
+    {
+        return (app_class.to_string(), "X".to_string());
+    }
+
+    for (marker, label) in [
+        ("chatgpt", "ChatGPT"),
+        ("claude", "Claude"),
+        ("github", "GitHub"),
+        ("leetcode", "LeetCode"),
+        ("vercel", "Vercel"),
+        ("whatsapp", "WhatsApp"),
+        ("x.com", "X"),
+        ("youtube", "YouTube"),
+    ] {
+        if folded_title.contains(marker) {
+            return (app_class.to_string(), label.to_string());
+        }
+    }
+
+    let is_repo = regex_like_repository(&raw_title) || regex_like_repository_context(&raw_title);
+    if is_repo {
+        return (app_class.to_string(), "GitHub".to_string());
+    }
+
+    if let Some((_, service)) = raw_title.rsplit_once(" - ") {
+        let service = service.trim();
+        if !service.is_empty() {
+            return (app_class.to_string(), service.to_string());
+        }
+    }
+
+    if is_probable_chatgpt_conversation_title(&raw_title) {
+        return (app_class.to_string(), "ChatGPT".to_string());
+    }
+
+    (app_class.to_string(), window_title.to_string())
+}
+
+fn regex_like_repository(value: &str) -> bool {
+    let mut parts = value.split('/');
+    matches!(
+        (parts.next(), parts.next(), parts.next()),
+        (Some(left), Some(right), None)
+            if !left.is_empty()
+                && !right.is_empty()
+                && left.chars().all(is_repository_char)
+                && right.chars().all(is_repository_char)
+    )
+}
+
+fn regex_like_repository_context(value: &str) -> bool {
+    if let Some((_, repository)) = value.rsplit_once(" · ") {
+        return regex_like_repository(repository);
+    }
+    false
+}
+
+fn is_repository_char(value: char) -> bool {
+    value.is_ascii_alphanumeric() || matches!(value, '_' | '.' | '-')
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RangePayload {
@@ -211,17 +361,34 @@ fn read_samples(
     let has_intervals = columns.iter().any(|column| column == "ended_at")
         && columns.iter().any(|column| column == "last_seen_at");
 
+    let has_window_full = columns.iter().any(|column| column == "window_full");
+
     let query = if has_intervals {
-        "SELECT sampled_at, app_class, window_title, ended_at, last_seen_at
+        if has_window_full {
+        "SELECT sampled_at, app_class, window_title, window_full, ended_at, last_seen_at
          FROM activity_samples
          WHERE sampled_at <= ?
            AND (sampled_at >= ? OR ended_at >= ? OR last_seen_at >= ?)
          ORDER BY sampled_at ASC"
+        } else {
+        "SELECT sampled_at, app_class, window_title, NULL AS window_full, ended_at, last_seen_at
+         FROM activity_samples
+         WHERE sampled_at <= ?
+           AND (sampled_at >= ? OR ended_at >= ? OR last_seen_at >= ?)
+         ORDER BY sampled_at ASC"
+        }
     } else {
-        "SELECT sampled_at, app_class, window_title, NULL AS ended_at, NULL AS last_seen_at
+        if has_window_full {
+        "SELECT sampled_at, app_class, window_title, window_full, NULL AS ended_at, NULL AS last_seen_at
          FROM activity_samples
          WHERE sampled_at >= ? AND sampled_at <= ?
          ORDER BY sampled_at ASC"
+        } else {
+        "SELECT sampled_at, app_class, window_title, NULL AS window_full, NULL AS ended_at, NULL AS last_seen_at
+         FROM activity_samples
+         WHERE sampled_at >= ? AND sampled_at <= ?
+         ORDER BY sampled_at ASC"
+        }
     };
 
     let mut statement = connection.prepare(query).map_err(|error| error.to_string())?;
@@ -244,13 +411,21 @@ fn read_samples(
                 row.get::<_, String>(2)?,
                 row.get::<_, Option<String>>(3)?,
                 row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<String>>(5)?,
             ))
         })
         .map_err(|error| error.to_string())?;
 
     let mut samples = Vec::new();
     for row in mapped {
-        let (sampled_at_raw, app_class, window_title, ended_at_raw, last_seen_raw) =
+        let (
+            sampled_at_raw,
+            app_class,
+            window_title,
+            window_full,
+            ended_at_raw,
+            last_seen_raw,
+        ) =
             row.map_err(|error| error.to_string())?;
         let sampled_at = parse_time(&sampled_at_raw)?;
         let legacy_end = add_minute(&sampled_at);
@@ -275,6 +450,9 @@ fn read_samples(
         if clipped_end <= clipped_start {
             continue;
         }
+
+        let (app_class, window_title) =
+            normalize_display_labels(&app_class, &window_title, window_full.as_deref());
 
         samples.push(ActivitySample {
             sampled_at: clipped_start,
