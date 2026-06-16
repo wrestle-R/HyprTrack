@@ -48,6 +48,13 @@ export type ActivityData = {
   range: EffectiveRange
   sessions: ActivitySession[]
   appClasses: string[]
+  lastHourCoverage: {
+    trackedMinutes: number
+    untrackedMinutes: number
+    coveragePercent: number
+    windowStart: string
+    windowEnd: string
+  }
   pagination: {
     page: number
     pageSize: number
@@ -68,17 +75,19 @@ export type HealthData = {
 }
 
 export type DesktopPage = "overview" | "activity" | "applications" | "settings"
-export type CollectorState = "stopped" | "running_app" | "error"
+export type TrackingServiceState =
+  | "running"
+  | "stopped"
+  | "starting"
+  | "restarting"
+  | "failed"
 
-export type CollectorStatus = {
-  state: CollectorState
-  dbPath: string
-  latestSampleAt: string | null
+export type TrackingServiceStatus = {
+  state: TrackingServiceState
   pid: number | null
-  managedByApp: boolean
   message: string
-}
-
-export type AutostartStatus = {
+  lastError: string | null
+  journalExcerpt: string[]
+  installed: boolean
   enabled: boolean
 }

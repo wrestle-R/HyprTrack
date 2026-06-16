@@ -3,11 +3,10 @@ import { invoke } from "@tauri-apps/api/core"
 import type {
   ActivityData,
   ApplicationsData,
-  AutostartStatus,
-  CollectorStatus,
   HealthData,
   OverviewData,
   RangeKey,
+  TrackingServiceStatus,
 } from "./types"
 
 export function getOverview(range: RangeKey) {
@@ -41,26 +40,22 @@ export function getHealth() {
   return invoke<HealthData>("get_health")
 }
 
-export function getCollectorStatus() {
-  return invoke<CollectorStatus>("get_collector_status")
+export function getTrackingServiceStatus() {
+  return invoke<TrackingServiceStatus>("get_tracking_service_status")
 }
 
-export function startCollector() {
-  return invoke<CollectorStatus>("start_collector")
+export function installTrackingService() {
+  return invoke<TrackingServiceStatus>("install_tracking_service")
 }
 
-export function stopCollector() {
-  return invoke<CollectorStatus>("stop_collector")
+export function startTrackingService() {
+  return invoke<TrackingServiceStatus>("start_tracking_service")
 }
 
-export function restartCollector() {
-  return invoke<CollectorStatus>("restart_collector")
+export function restartTrackingService() {
+  return invoke<TrackingServiceStatus>("restart_tracking_service")
 }
 
-export function getAutostartStatus() {
-  return invoke<AutostartStatus>("get_autostart_status")
-}
-
-export function setAutostart(enabled: boolean) {
-  return invoke<AutostartStatus>("set_autostart", { enabled })
+export function uninstallTrackingService() {
+  return invoke<TrackingServiceStatus>("uninstall_tracking_service")
 }

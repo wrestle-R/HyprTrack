@@ -8,15 +8,13 @@ use std::{
     os::unix::net::UnixStream,
     path::{Path, PathBuf},
     process::Command,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
-    },
-    thread::{self, JoinHandle},
+    sync::atomic::{AtomicBool, Ordering},
+    thread,
     time::{Duration, Instant, SystemTime},
 };
 
-const CHECKPOINT_INTERVAL: Duration = Duration::from_secs(60);
+const CHECKPOINT_INTERVAL: Duration = Duration::from_secs(15);
+const RECONCILE_INTERVAL: Duration = Duration::from_secs(5);
 const SUSPEND_GAP_SECONDS: f64 = 5.0;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -341,6 +339,25 @@ impl EventProcessor {
         }
         Ok(())
     }
+
+    pub fn reconcile_active_window(
+        &mut self,
+        active_window: Option<WindowInfo>,
+        observed_at: &str,
+    ) -> Result<(), String> {
+        let Some(window) = active_window else {
+            self.active_address = None;
+            self.tracker.pause(observed_at)?;
+            return Ok(());
+        };
+        let known_window = self.windows.get(&window.address);
+        let changed = self.active_address.as_deref() != Some(window.address.as_str())
+            || known_window != Some(&window);
+        if changed {
+            self.observe(window, observed_at)?;
+        }
+        Ok(())
+    }
 }
 
 pub fn suspension_detected(
@@ -406,27 +423,6 @@ fn event_socket_path() -> Result<PathBuf, String> {
         .join(".socket2.sock"))
 }
 
-#[derive(Clone, Default)]
-pub struct RuntimeState {
-    pub running: bool,
-    pub last_error: Option<String>,
-}
-
-pub struct CollectorHandle {
-    stop: Arc<AtomicBool>,
-    thread: Option<JoinHandle<()>>,
-    pub state: Arc<Mutex<RuntimeState>>,
-}
-
-impl CollectorHandle {
-    pub fn stop(mut self) {
-        self.stop.store(true, Ordering::Relaxed);
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
-        }
-    }
-}
-
 fn wall_seconds() -> f64 {
     SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -446,6 +442,7 @@ fn listen(database_path: &Path, stop: &AtomicBool) -> Result<(), String> {
     }
     let mut reader = BufReader::new(stream);
     let mut next_checkpoint = Instant::now() + CHECKPOINT_INTERVAL;
+    let mut next_reconcile = Instant::now() + RECONCILE_INTERVAL;
     let mut previous_wall = wall_seconds();
     let mut previous_monotonic = Instant::now();
     let mut line = String::new();
@@ -485,48 +482,29 @@ fn listen(database_path: &Path, stop: &AtomicBool) -> Result<(), String> {
             processor.tracker.checkpoint(&now_ist())?;
             next_checkpoint = Instant::now() + CHECKPOINT_INTERVAL;
         }
+        if Instant::now() >= next_reconcile {
+            processor.reconcile_active_window(query_active_window()?, &now_ist())?;
+            next_reconcile = Instant::now() + RECONCILE_INTERVAL;
+        }
     }
     processor.tracker.pause(&now_ist())?;
     Ok(())
 }
 
-pub fn start(database_path: PathBuf) -> Result<CollectorHandle, String> {
+pub fn run_service(database_path: PathBuf) -> Result<(), String> {
     recover_interrupted_activity(&database_path)?;
-    let stop = Arc::new(AtomicBool::new(false));
-    let state = Arc::new(Mutex::new(RuntimeState {
-        running: true,
-        last_error: None,
-    }));
-    let thread_stop = stop.clone();
-    let thread_state = state.clone();
-    let thread = thread::Builder::new()
-        .name("hyprtrack-collector".into())
-        .spawn(move || {
-            let mut delay = Duration::from_millis(250);
-            while !thread_stop.load(Ordering::Relaxed) {
-                if let Err(error) = listen(&database_path, &thread_stop) {
-                    if let Ok(mut state) = thread_state.lock() {
-                        state.last_error = Some(error);
-                    }
-                    if thread_stop.load(Ordering::Relaxed) {
-                        break;
-                    }
-                    thread::sleep(delay);
-                    delay = (delay * 2).min(Duration::from_secs(5));
-                } else {
-                    delay = Duration::from_millis(250);
-                }
+    let stop = AtomicBool::new(false);
+    let mut delay = Duration::from_millis(250);
+    loop {
+        match listen(&database_path, &stop) {
+            Ok(()) => delay = Duration::from_millis(250),
+            Err(error) => {
+                eprintln!("HyprTrack collector waiting for Hyprland: {error}");
+                thread::sleep(delay);
+                delay = (delay * 2).min(Duration::from_secs(5));
             }
-            if let Ok(mut state) = thread_state.lock() {
-                state.running = false;
-            }
-        })
-        .map_err(|error| error.to_string())?;
-    Ok(CollectorHandle {
-        stop,
-        thread: Some(thread),
-        state,
-    })
+        }
+    }
 }
 
 #[cfg(test)]
@@ -762,6 +740,65 @@ mod tests {
             (
                 "2026-06-14T10:04:00+05:30".into(),
                 "2026-06-14T10:04:00+05:30".into(),
+            )
+        );
+    }
+
+    #[test]
+    fn checkpoint_interval_is_short_enough_for_service_crash_recovery() {
+        assert_eq!(CHECKPOINT_INTERVAL, Duration::from_secs(15));
+    }
+
+    #[test]
+    fn reconciliation_records_missed_active_window_change() {
+        let directory = tempdir().unwrap();
+        let database = directory.path().join("hyprtrack.db");
+        let tracker = ActivityTracker::new(database.clone()).unwrap();
+        let windows = HashMap::from([(
+            "aaa".into(),
+            WindowInfo::new("aaa", "zen", "First - YouTube — Zen Browser"),
+        )]);
+        let mut processor = EventProcessor::new(tracker, windows);
+
+        processor
+            .handle("activewindowv2>>aaa", "2026-06-14T10:00:00.000+05:30")
+            .unwrap();
+        processor
+            .reconcile_active_window(
+                Some(WindowInfo::new(
+                    "bbb",
+                    "code",
+                    "HyprTrack - Visual Studio Code",
+                )),
+                "2026-06-14T10:00:05.000+05:30",
+            )
+            .unwrap();
+
+        let rows = Connection::open(database)
+            .unwrap()
+            .prepare("SELECT window_address, window_title, sampled_at, ended_at FROM activity_samples ORDER BY id")
+            .unwrap()
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                ))
+            })
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].3.as_deref(), Some("2026-06-14T10:00:05.000+05:30"));
+        assert_eq!(
+            rows[1],
+            (
+                Some("bbb".into()),
+                "VS Code".into(),
+                "2026-06-14T10:00:05.000+05:30".into(),
+                None,
             )
         );
     }

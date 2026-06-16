@@ -1,5 +1,19 @@
-import { render, screen } from "@testing-library/react"
-import { describe, expect, it, vi } from "vitest"
+import { render, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+
+const invokeMock = vi.hoisted(() => vi.fn())
+const serviceStatus = vi.hoisted(() => ({
+  state: "running",
+  dbPath: "/home/test/.local/share/com.hyprtrack.desktop/hyprtrack.db",
+  latestSampleAt: "2026-06-14T13:37:43.221+05:30",
+  pid: 42 as number | null,
+  message: "Tracking service is running.",
+  lastError: null,
+  journalExcerpt: [],
+  installed: true,
+  enabled: true,
+}))
 
 vi.mock("recharts", async () => {
   const actual = await vi.importActual<typeof import("recharts")>("recharts")
@@ -14,7 +28,7 @@ vi.mock("recharts", async () => {
 })
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(async (command: string) => {
+  invoke: invokeMock.mockImplementation(async (command: string) => {
     switch (command) {
       case "get_health":
         return {
@@ -22,17 +36,13 @@ vi.mock("@tauri-apps/api/core", () => ({
           sampleCount: 439,
           latestSampleAt: "2026-06-14T13:37:43.221+05:30",
         }
-      case "get_collector_status":
-        return {
-          state: "running_app",
-          dbPath: "/home/test/.local/share/com.hyprtrack.desktop/hyprtrack.db",
-          latestSampleAt: "2026-06-14T13:37:43.221+05:30",
-          pid: 42,
-          managedByApp: true,
-          message: "Collector is running inside HyprTrack Desktop.",
-        }
-      case "get_autostart_status":
-        return { enabled: false }
+      case "get_tracking_service_status":
+        return { ...serviceStatus }
+      case "install_tracking_service":
+      case "start_tracking_service":
+      case "restart_tracking_service":
+      case "uninstall_tracking_service":
+        return { ...serviceStatus, state: "running", message: "Tracking service is running." }
       case "get_overview":
         return {
           range: {
@@ -68,6 +78,13 @@ vi.mock("@tauri-apps/api/core", () => ({
           },
           sessions: [],
           appClasses: ["code", "zen"],
+          lastHourCoverage: {
+            trackedMinutes: 42,
+            untrackedMinutes: 18,
+            coveragePercent: 70,
+            windowStart: "2026-06-14T12:37:43+05:30",
+            windowEnd: "2026-06-14T13:37:43+05:30",
+          },
           pagination: {
             page: 1,
             pageSize: 15,
@@ -98,6 +115,15 @@ vi.mock("@tauri-apps/api/event", () => ({
 import App from "./App"
 
 describe("App", () => {
+  beforeEach(() => {
+    invokeMock.mockClear()
+    serviceStatus.state = "running"
+    serviceStatus.message = "Tracking service is running."
+    serviceStatus.lastError = null
+    serviceStatus.installed = true
+    serviceStatus.enabled = true
+  })
+
   it("renders the desktop dashboard shell instead of the starter greet screen", async () => {
     render(<App />)
 
@@ -113,5 +139,42 @@ describe("App", () => {
     expect(
       screen.queryByText("Welcome to Tauri + React")
     ).not.toBeInTheDocument()
+  })
+
+  it("shows a warning banner and keeps historical data visible when service is stopped", async () => {
+    serviceStatus.state = "stopped"
+    serviceStatus.message = "Tracking service is stopped."
+    serviceStatus.pid = null
+
+    render(<App />)
+
+    expect(await screen.findByText("Tracking service is stopped.")).toBeInTheDocument()
+    expect(await screen.findByText("Tracked time")).toBeInTheDocument()
+    expect(await screen.findByText("2h")).toBeInTheDocument()
+  })
+
+  it("calls the start service command from settings", async () => {
+    const user = userEvent.setup()
+    serviceStatus.state = "stopped"
+    serviceStatus.message = "Tracking service is stopped."
+
+    render(<App />)
+    await user.click(await screen.findByRole("button", { name: "Settings" }))
+    await user.click(await screen.findByRole("button", { name: "Start Service" }))
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("start_tracking_service")
+    })
+  })
+
+  it("renders the last hour coverage box on the activity page", async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+    await user.click(await screen.findByRole("button", { name: "Activity" }))
+
+    expect(await screen.findByText("Last 60 minutes")).toBeInTheDocument()
+    expect(screen.getByText("42 minutes tracked")).toBeInTheDocument()
+    expect(screen.getByText("18 minutes untracked")).toBeInTheDocument()
   })
 })

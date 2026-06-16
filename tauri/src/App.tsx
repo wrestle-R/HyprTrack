@@ -26,9 +26,12 @@ import { useDesktopQuery } from "./hooks/use-desktop-query"
 import {
   getActivity,
   getApplications,
-  getAutostartStatus,
+  getTrackingServiceStatus,
   getOverview,
-  setAutostart,
+  installTrackingService,
+  restartTrackingService,
+  startTrackingService,
+  uninstallTrackingService,
 } from "./lib/desktop-api"
 import {
   getApplicationSource,
@@ -55,9 +58,11 @@ import type {
   DesktopPage,
   OverviewData,
   RangeKey,
+  TrackingServiceStatus,
 } from "./lib/types"
 
 const AUTO_REFRESH_INTERVAL_MS = 60_000
+const SERVICE_REFRESH_INTERVAL_MS = 5_000
 
 const PAGES: Array<{
   id: DesktopPage
@@ -123,6 +128,63 @@ function EmptyState({
       <h3>{title}</h3>
       <p>{description}</p>
     </div>
+  )
+}
+
+function ServiceWarningBanner({
+  serviceStatus,
+}: {
+  serviceStatus: TrackingServiceStatus | null
+}) {
+  if (!serviceStatus || serviceStatus.state === "running") {
+    return null
+  }
+
+  return (
+    <section className="service-warning" role="status">
+      <div>
+        <strong>{serviceStatus.message}</strong>
+        <p>
+          Historical data is still available. Start or restart the user service
+          from Settings to resume tracking.
+        </p>
+        {serviceStatus.lastError ? <p>{serviceStatus.lastError}</p> : null}
+      </div>
+      <span className="pill">{serviceStatus.state}</span>
+    </section>
+  )
+}
+
+function LastHourCoverageBox({
+  coverage,
+}: {
+  coverage: ActivityData["lastHourCoverage"]
+}) {
+  return (
+    <section className="panel coverage-panel">
+      <div className="panel-header">
+        <div>
+          <h2>Last 60 minutes</h2>
+          <p>
+            {formatTimestamp(coverage.windowStart, true)} to{" "}
+            {formatTimestamp(coverage.windowEnd, true)}
+          </p>
+        </div>
+        <span className="pill">{coverage.coveragePercent}% covered</span>
+      </div>
+      <div className="coverage-grid">
+        <Metric
+          label="Tracked"
+          value={`${Math.round(coverage.trackedMinutes)} minutes tracked`}
+          detail="Confirmed by saved last-seen checkpoints"
+        />
+        <Metric
+          label="Untracked"
+          value={`${Math.round(coverage.untrackedMinutes)} minutes untracked`}
+          detail="No recorded service coverage"
+        />
+      </div>
+    </section>
   )
 }
 
@@ -237,10 +299,12 @@ function OverviewPage({
   range,
   refreshVersion,
   productiveTitles,
+  serviceStatus,
 }: {
   range: RangeKey
   refreshVersion: number
   productiveTitles: string[]
+  serviceStatus: TrackingServiceStatus | null
 }) {
   const query = useDesktopQuery<OverviewData>(
     () => getOverview(range),
@@ -274,6 +338,7 @@ function OverviewPage({
 
   return (
     <div className="page-stack">
+      <ServiceWarningBanner serviceStatus={serviceStatus} />
       <section className="hero-panel">
         <div>
           <p className="eyebrow">{query.data.range.label}</p>
@@ -464,10 +529,12 @@ function ActivityPage({
   range,
   refreshVersion,
   compact,
+  serviceStatus,
 }: {
   range: RangeKey
   refreshVersion: number
   compact: boolean
+  serviceStatus: TrackingServiceStatus | null
 }) {
   const [search, setSearch] = React.useState("")
   const deferredSearch = React.useDeferredValue(search)
@@ -517,6 +584,8 @@ function ActivityPage({
 
   return (
     <div className="page-stack">
+      <ServiceWarningBanner serviceStatus={serviceStatus} />
+      <LastHourCoverageBox coverage={query.data.lastHourCoverage} />
       <section className="panel filters-panel">
         <div className="panel-header">
           <div>
@@ -630,9 +699,11 @@ function ActivityPage({
 function ApplicationsPage({
   range,
   refreshVersion,
+  serviceStatus,
 }: {
   range: RangeKey
   refreshVersion: number
+  serviceStatus: TrackingServiceStatus | null
 }) {
   const [search, setSearch] = React.useState("")
   const deferredSearch = React.useDeferredValue(search)
@@ -658,6 +729,7 @@ function ApplicationsPage({
 
   return (
     <div className="page-stack">
+      <ServiceWarningBanner serviceStatus={serviceStatus} />
       <section className="panel filters-panel">
         <div className="panel-header">
           <div>
@@ -722,8 +794,12 @@ function ApplicationsPage({
 function SettingsPage({
   preferences,
   updatePreferences,
-  autostartEnabled,
-  onToggleAutostart,
+  serviceStatus,
+  serviceBusy,
+  onInstallService,
+  onStartService,
+  onRestartService,
+  onUninstallService,
 }: {
   preferences: DesktopPreferences
   updatePreferences: (
@@ -731,8 +807,12 @@ function SettingsPage({
       | Partial<DesktopPreferences>
       | ((current: DesktopPreferences) => DesktopPreferences)
   ) => void
-  autostartEnabled: boolean
-  onToggleAutostart: (enabled: boolean) => void
+  serviceStatus: TrackingServiceStatus | null
+  serviceBusy: boolean
+  onInstallService: () => void
+  onStartService: () => void
+  onRestartService: () => void
+  onUninstallService: () => void
 }) {
   const [applicationSource, setApplicationSource] =
     React.useState<ApplicationSource>("app")
@@ -844,19 +924,66 @@ function SettingsPage({
       </section>
 
       <section className="panel">
-        <div className="toggle-row settings-toggle-row">
+        <div className="panel-header">
           <div>
-            <strong>Launch at login</strong>
-            <p>Start tracking in the system tray when you log in.</p>
+            <h2>Tracking service</h2>
+            <p>
+              HyprTrack records activity through a systemd user service, so the
+              desktop window can close without stopping tracking.
+            </p>
           </div>
-          <label className="switch">
-            <input
-              type="checkbox"
-              checked={autostartEnabled}
-              onChange={(event) => onToggleAutostart(event.currentTarget.checked)}
-            />
-            <span />
-          </label>
+          <span className="pill">{serviceStatus?.state ?? "checking"}</span>
+        </div>
+        <div className="service-details">
+          <div>
+            <span>Installed</span>
+            <strong>{serviceStatus?.installed ? "Yes" : "No"}</strong>
+          </div>
+          <div>
+            <span>Enabled</span>
+            <strong>{serviceStatus?.enabled ? "Yes" : "No"}</strong>
+          </div>
+          <div>
+            <span>PID</span>
+            <strong>{serviceStatus?.pid ?? "None"}</strong>
+          </div>
+        </div>
+        <p className="service-message">
+          {serviceStatus?.message ?? "Checking tracking service status."}
+        </p>
+        <div className="service-actions">
+          <button
+            className="button secondary"
+            type="button"
+            disabled={serviceBusy}
+            onClick={onInstallService}
+          >
+            Install Service
+          </button>
+          <button
+            className="button primary"
+            type="button"
+            disabled={serviceBusy}
+            onClick={onStartService}
+          >
+            Start Service
+          </button>
+          <button
+            className="button secondary"
+            type="button"
+            disabled={serviceBusy}
+            onClick={onRestartService}
+          >
+            Restart Service
+          </button>
+          <button
+            className="button secondary"
+            type="button"
+            disabled={serviceBusy}
+            onClick={onUninstallService}
+          >
+            Uninstall Service
+          </button>
         </div>
       </section>
 
@@ -941,18 +1068,16 @@ function App() {
   const [refreshVersion, setRefreshVersion] = React.useState(0)
   const [refreshRequestedAt, setRefreshRequestedAt] =
     React.useState<Date | null>(null)
-  const [autostartEnabled, setAutostartEnabled] = React.useState(false)
+  const [serviceRefreshVersion, setServiceRefreshVersion] = React.useState(0)
+  const [serviceBusy, setServiceBusy] = React.useState(false)
   const [autoRefreshEnabled, setAutoRefreshEnabled] = React.useState(false)
   const range = rangeOverride ?? preferences.defaultRange
   const resolvedTheme = useResolvedTheme(preferences.theme)
 
-  const autostart = useDesktopQuery(() => getAutostartStatus(), [refreshVersion])
-
-  React.useEffect(() => {
-    if (autostart.data) {
-      setAutostartEnabled(autostart.data.enabled)
-    }
-  }, [autostart.data])
+  const serviceStatus = useDesktopQuery(
+    () => getTrackingServiceStatus(),
+    [serviceRefreshVersion]
+  )
 
   React.useEffect(() => {
     document.documentElement.classList.toggle("dark", resolvedTheme === "dark")
@@ -993,9 +1118,24 @@ function App() {
     return () => window.clearInterval(interval)
   }, [autoRefreshEnabled, page, requestRefresh])
 
-  async function toggleAutostart(enabled: boolean) {
-    const next = await setAutostart(enabled)
-    setAutostartEnabled(next.enabled)
+  React.useEffect(() => {
+    const interval = window.setInterval(() => {
+      setServiceRefreshVersion((version) => version + 1)
+    }, SERVICE_REFRESH_INTERVAL_MS)
+    return () => window.clearInterval(interval)
+  }, [])
+
+  async function runServiceAction(
+    action: () => Promise<TrackingServiceStatus>
+  ) {
+    setServiceBusy(true)
+    try {
+      await action()
+      setServiceRefreshVersion((version) => version + 1)
+      requestRefresh()
+    } finally {
+      setServiceBusy(false)
+    }
   }
 
   const pageTitle = PAGES.find((item) => item.id === page)?.label ?? "HyprTrack"
@@ -1072,6 +1212,7 @@ function App() {
               range={range}
               refreshVersion={refreshVersion}
               productiveTitles={preferences.productiveTitles}
+              serviceStatus={serviceStatus.data ?? null}
             />
           ) : null}
           {page === "activity" ? (
@@ -1079,17 +1220,26 @@ function App() {
               range={range}
               refreshVersion={refreshVersion}
               compact={preferences.tableDensity === "compact"}
+              serviceStatus={serviceStatus.data ?? null}
             />
           ) : null}
           {page === "applications" ? (
-            <ApplicationsPage range={range} refreshVersion={refreshVersion} />
+            <ApplicationsPage
+              range={range}
+              refreshVersion={refreshVersion}
+              serviceStatus={serviceStatus.data ?? null}
+            />
           ) : null}
           {page === "settings" ? (
             <SettingsPage
               preferences={preferences}
               updatePreferences={updatePreferences}
-              autostartEnabled={autostartEnabled}
-              onToggleAutostart={toggleAutostart}
+              serviceStatus={serviceStatus.data ?? null}
+              serviceBusy={serviceBusy}
+              onInstallService={() => runServiceAction(installTrackingService)}
+              onStartService={() => runServiceAction(startTrackingService)}
+              onRestartService={() => runServiceAction(restartTrackingService)}
+              onUninstallService={() => runServiceAction(uninstallTrackingService)}
             />
           ) : null}
         </section>

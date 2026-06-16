@@ -219,6 +219,16 @@ pub struct TimelinePoint {
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct LastHourCoverage {
+    pub tracked_minutes: f64,
+    pub untracked_minutes: f64,
+    pub coverage_percent: f64,
+    pub window_start: String,
+    pub window_end: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OverviewData {
     pub range: RangePayload,
     pub tracked_minutes: f64,
@@ -245,6 +255,7 @@ pub struct ActivityData {
     pub range: RangePayload,
     pub sessions: Vec<ActivitySession>,
     pub app_classes: Vec<String>,
+    pub last_hour_coverage: LastHourCoverage,
     pub pagination: Pagination,
 }
 
@@ -691,6 +702,34 @@ fn build_timeline(samples: &[ActivitySample], range: &EffectiveRange) -> Vec<Tim
     points
 }
 
+fn calculate_last_hour_coverage(
+    connection: &Connection,
+    window_end: DateTime<FixedOffset>,
+) -> Result<LastHourCoverage, String> {
+    let window_start = window_end - Duration::minutes(60);
+    let range = EffectiveRange {
+        key: "last-hour".into(),
+        start: window_start,
+        end: window_end,
+        label: "Last 60 minutes".into(),
+    };
+    let tracked_minutes = round_minutes(
+        read_samples(connection, &range)?
+            .iter()
+            .map(sample_minutes)
+            .sum(),
+    );
+    let untracked_minutes = round_minutes((60.0 - tracked_minutes).max(0.0));
+    let coverage_percent = round_minutes((tracked_minutes / 60.0) * 100.0);
+    Ok(LastHourCoverage {
+        tracked_minutes,
+        untracked_minutes,
+        coverage_percent,
+        window_start: format_seconds(window_start),
+        window_end: format_seconds(window_end),
+    })
+}
+
 fn calculate_streak(connection: &Connection, end: &DateTime<FixedOffset>) -> Result<usize, String> {
     let mut statement = connection
         .prepare(
@@ -803,6 +842,7 @@ pub fn read_activity(
         range: range_payload(&range),
         sessions: paged,
         app_classes,
+        last_hour_coverage: calculate_last_hour_coverage(&connection, range.end)?,
         pagination: Pagination {
             page,
             page_size,
@@ -857,4 +897,46 @@ pub fn read_health(database_path: &str) -> Result<HealthData, String> {
         sample_count,
         latest_sample_at,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::initialize_database;
+    use rusqlite::Connection;
+    use tempfile::tempdir;
+
+    #[test]
+    fn last_hour_coverage_caps_open_interval_at_last_seen() {
+        let directory = tempdir().unwrap();
+        let database = directory.path().join("hyprtrack.db");
+        initialize_database(&database).unwrap();
+        Connection::open(&database)
+            .unwrap()
+            .execute(
+                "INSERT INTO activity_samples (
+                    sampled_at, app_class, window_title, window_full,
+                    ended_at, last_seen_at, window_address
+                 ) VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6)",
+                (
+                    "2026-06-14T10:30:00+05:30",
+                    "code",
+                    "VS Code",
+                    "HyprTrack - Visual Studio Code",
+                    "2026-06-14T10:45:00+05:30",
+                    "abc",
+                ),
+            )
+            .unwrap();
+
+        let connection = open_database(database.to_str().unwrap()).unwrap();
+        let window_end = parse_time("2026-06-14T11:00:00+05:30").unwrap();
+        let coverage = calculate_last_hour_coverage(&connection, window_end).unwrap();
+
+        assert_eq!(coverage.tracked_minutes, 15.0);
+        assert_eq!(coverage.untracked_minutes, 45.0);
+        assert_eq!(coverage.coverage_percent, 25.0);
+        assert_eq!(coverage.window_start, "2026-06-14T10:00:00+05:30");
+        assert_eq!(coverage.window_end, "2026-06-14T11:00:00+05:30");
+    }
 }

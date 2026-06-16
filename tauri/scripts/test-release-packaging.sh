@@ -4,6 +4,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
+VERSION="$(node -e 'const fs=require("fs"); console.log(JSON.parse(fs.readFileSync("src-tauri/tauri.conf.json","utf8")).version)')"
+EXPECTED_APPIMAGE="HyprTrack.Desktop_${VERSION}_amd64.AppImage"
+
+if [[ "$EXPECTED_APPIMAGE" != "HyprTrack.Desktop_0.1.5_amd64.AppImage" ]]; then
+  echo "Unexpected release AppImage name: $EXPECTED_APPIMAGE"
+  exit 1
+fi
 
 APPDIR="$TMP_DIR/HyprTrack Desktop.AppDir"
 mkdir -p \
