@@ -69,7 +69,7 @@ To remove the AppImage:
 
 ```bash
 rm ~/.local/bin/hyprtrack-desktop.AppImage
-rm ~/.local/share/applications/com.hyprtrack.desktop
+rm ~/.local/share/applications/hyprtrack-desktop.desktop
 rm ~/.local/share/icons/hicolor/128x128/apps/hyprtrack-desktop.png
 ```
 
@@ -94,7 +94,7 @@ systemctl --user daemon-reload
 
 ```bash
 rm ~/.local/bin/hyprtrack-desktop.AppImage
-rm ~/.local/share/applications/com.hyprtrack.desktop
+rm ~/.local/share/applications/hyprtrack-desktop.desktop
 rm ~/.local/share/icons/hicolor/128x128/apps/hyprtrack-desktop.png
 ```
 

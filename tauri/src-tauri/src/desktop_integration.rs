@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const DESKTOP_FILE_NAME: &str = "com.hyprtrack.desktop";
+const DESKTOP_FILE_NAME: &str = "hyprtrack-desktop.desktop";
 const ICON_FILE_NAME: &str = "hyprtrack-desktop.png";
 const ICON_BYTES: &[u8] = include_bytes!("../icons/128x128.png");
 
@@ -17,7 +17,7 @@ fn quote_exec_path(path: &Path) -> String {
     format!("\"{escaped}\"")
 }
 
-fn desktop_entry(appimage_path: &Path, icon_path: &Path) -> String {
+fn desktop_entry(appimage_path: &Path) -> String {
     format!(
         "[Desktop Entry]\n\
          Version=1.0\n\
@@ -25,13 +25,12 @@ fn desktop_entry(appimage_path: &Path, icon_path: &Path) -> String {
          Name=HyprTrack Desktop\n\
          Comment=Local Hyprland activity intelligence\n\
          Exec={}\n\
-         Icon={}\n\
+         Icon=hyprtrack-desktop\n\
          Terminal=false\n\
          Categories=Utility;\n\
          StartupWMClass=hyprtrack-desktop\n\
          X-AppImage-Name=HyprTrack Desktop\n",
         quote_exec_path(appimage_path),
-        icon_path.display(),
     )
 }
 
@@ -47,8 +46,7 @@ fn install_appimage_desktop_entry(
     fs::create_dir_all(&applications_dir).map_err(|error| error.to_string())?;
     fs::create_dir_all(&icon_dir).map_err(|error| error.to_string())?;
     fs::write(&icon_path, ICON_BYTES).map_err(|error| error.to_string())?;
-    fs::write(&launcher_path, desktop_entry(appimage_path, &icon_path))
-        .map_err(|error| error.to_string())?;
+    fs::write(&launcher_path, desktop_entry(appimage_path)).map_err(|error| error.to_string())?;
 
     Ok(launcher_path)
 }
@@ -79,15 +77,12 @@ mod tests {
 
     #[test]
     fn desktop_entry_uses_absolute_appimage_and_icon_paths() {
-        let entry = desktop_entry(
-            Path::new("/home/test/Applications/HyprTrack Desktop.AppImage"),
-            Path::new("/home/test/.local/share/icons/hicolor/128x128/apps/hyprtrack-desktop.png"),
-        );
+        let entry = desktop_entry(Path::new(
+            "/home/test/Applications/HyprTrack Desktop.AppImage",
+        ));
 
         assert!(entry.contains("Exec=\"/home/test/Applications/HyprTrack Desktop.AppImage\"\n"));
-        assert!(entry.contains(
-            "Icon=/home/test/.local/share/icons/hicolor/128x128/apps/hyprtrack-desktop.png\n"
-        ));
+        assert!(entry.contains("Icon=hyprtrack-desktop\n"));
         assert!(entry.contains("StartupWMClass=hyprtrack-desktop\n"));
     }
 
@@ -104,13 +99,13 @@ mod tests {
 
         assert_eq!(
             launcher,
-            temp.path().join("applications/com.hyprtrack.desktop")
+            temp.path().join("applications/hyprtrack-desktop.desktop")
         );
         assert!(launcher.is_file());
         assert!(icon.is_file());
 
         let entry = fs::read_to_string(launcher).unwrap();
-        assert!(entry.contains(&format!("Icon={}\n", icon.display())));
+        assert!(entry.contains("Icon=hyprtrack-desktop\n"));
         assert!(entry.contains(&format!("Exec=\"{}\"\n", appimage.display())));
     }
 }
