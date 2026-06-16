@@ -6,7 +6,6 @@ import type {
   HealthData,
   OverviewData,
   RangeKey,
-  TrackingServiceStatus,
 } from "./types"
 
 export function getOverview(range: RangeKey) {
@@ -38,24 +37,4 @@ export function getApplications(range: RangeKey, search?: string) {
 
 export function getHealth() {
   return invoke<HealthData>("get_health")
-}
-
-export function getTrackingServiceStatus() {
-  return invoke<TrackingServiceStatus>("get_tracking_service_status")
-}
-
-export function installTrackingService() {
-  return invoke<TrackingServiceStatus>("install_tracking_service")
-}
-
-export function startTrackingService() {
-  return invoke<TrackingServiceStatus>("start_tracking_service")
-}
-
-export function restartTrackingService() {
-  return invoke<TrackingServiceStatus>("restart_tracking_service")
-}
-
-export function uninstallTrackingService() {
-  return invoke<TrackingServiceStatus>("uninstall_tracking_service")
 }

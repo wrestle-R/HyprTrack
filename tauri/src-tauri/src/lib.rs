@@ -1,10 +1,8 @@
 mod analytics;
-mod collector;
 mod desktop_integration;
 mod storage;
-pub mod tracking_service;
 
-use std::path::{Path, PathBuf};
+use std::{fs, path::PathBuf};
 
 use analytics::{
     read_activity, read_applications, read_health, read_overview, ActivityData, ApplicationsData,
@@ -17,6 +15,11 @@ use tauri::{
     tray::TrayIconBuilder,
     AppHandle, Emitter, Manager, State, WindowEvent,
 };
+
+const COLLECTOR_SCRIPT_BYTES: &[u8] =
+    include_bytes!("../../../collector/hyprtrack-monitor.py");
+const COLLECTOR_SCRIPT_NAME: &str = "hyprtrack-monitor.py";
+const COLLECTOR_DATABASE_NAME: &str = "hyprtrack.db";
 
 struct AppState {
     database_path: PathBuf,
@@ -69,31 +72,6 @@ fn show_main_window(app: AppHandle) {
     show_main_window_impl(&app);
 }
 
-#[tauri::command]
-fn get_tracking_service_status() -> tracking_service::TrackingServiceStatus {
-    tracking_service::get_status()
-}
-
-#[tauri::command]
-fn install_tracking_service() -> Result<tracking_service::TrackingServiceStatus, String> {
-    tracking_service::install()
-}
-
-#[tauri::command]
-fn start_tracking_service() -> Result<tracking_service::TrackingServiceStatus, String> {
-    tracking_service::start()
-}
-
-#[tauri::command]
-fn restart_tracking_service() -> Result<tracking_service::TrackingServiceStatus, String> {
-    tracking_service::restart()
-}
-
-#[tauri::command]
-fn uninstall_tracking_service() -> Result<tracking_service::TrackingServiceStatus, String> {
-    tracking_service::uninstall()
-}
-
 fn emit_refresh(app: &AppHandle) {
     let _ = app.emit("hyprtrack://refresh", ());
 }
@@ -116,10 +94,8 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Show window", true, None::<&str>)?;
     let hide = MenuItem::with_id(app, "hide", "Hide window", true, None::<&str>)?;
     let refresh = MenuItem::with_id(app, "refresh", "Refresh data", true, None::<&str>)?;
-    let start = MenuItem::with_id(app, "start", "Start Service", true, None::<&str>)?;
-    let restart = MenuItem::with_id(app, "restart", "Restart Service", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &hide, &refresh, &start, &restart, &quit])?;
+    let menu = Menu::with_items(app, &[&show, &hide, &refresh, &quit])?;
 
     let handle = app.clone();
     let mut tray_builder = TrayIconBuilder::new()
@@ -129,14 +105,6 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             "show" => show_main_window_impl(app_handle),
             "hide" => hide_main_window_impl(app_handle),
             "refresh" => emit_refresh(app_handle),
-            "start" => {
-                let _ = tracking_service::start();
-                emit_refresh(app_handle);
-            }
-            "restart" => {
-                let _ = tracking_service::restart();
-                emit_refresh(app_handle);
-            }
             "quit" => app_handle.exit(0),
             _ => {}
         });
@@ -148,57 +116,68 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-fn legacy_database_candidate() -> Option<PathBuf> {
+fn home_dir() -> Result<PathBuf, String> {
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .filter(|path| !path.as_os_str().is_empty())
+        .ok_or_else(|| "HOME is unavailable; cannot resolve HyprTrack paths.".to_string())
+}
+
+fn collector_dir() -> Result<PathBuf, String> {
+    Ok(home_dir()?.join(".local/bin/hyprtrack/collector"))
+}
+
+fn collector_script_path() -> Result<PathBuf, String> {
+    Ok(collector_dir()?.join(COLLECTOR_SCRIPT_NAME))
+}
+
+fn collector_database_path() -> Result<PathBuf, String> {
+    Ok(collector_dir()?.join(COLLECTOR_DATABASE_NAME))
+}
+
+fn old_app_data_database_candidate() -> Option<PathBuf> {
     if let Some(path) = std::env::var_os("HYPRTRACK_LEGACY_DB").map(PathBuf::from) {
         return path.is_file().then_some(path);
     }
-    let roots = [
-        std::env::current_dir().ok(),
-        std::env::current_exe()
-            .ok()
-            .and_then(|path| path.parent().map(Path::to_path_buf)),
-    ];
-    roots
-        .into_iter()
-        .flatten()
-        .flat_map(|root| {
-            root.ancestors()
-                .map(|ancestor| ancestor.join("collector/hyprtrack.db"))
-                .collect::<Vec<_>>()
-        })
-        .find(|path| path.is_file())
+    let data_home = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home_dir().unwrap_or_default().join(".local/share"));
+    let candidate = data_home
+        .join("com.hyprtrack.desktop")
+        .join(COLLECTOR_DATABASE_NAME);
+    candidate.is_file().then_some(candidate)
 }
 
-fn fallback_app_data_dir() -> Result<PathBuf, String> {
-    if let Some(path) = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from) {
-        return Ok(path.join("com.hyprtrack.desktop"));
+fn install_collector_script() -> Result<PathBuf, String> {
+    let script_path = collector_script_path()?;
+    let Some(parent) = script_path.parent() else {
+        return Err("Unable to resolve HyprTrack collector directory.".into());
+    };
+    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+
+    let needs_write = fs::read(&script_path)
+        .map(|existing| existing != COLLECTOR_SCRIPT_BYTES)
+        .unwrap_or(true);
+    if needs_write {
+        fs::write(&script_path, COLLECTOR_SCRIPT_BYTES).map_err(|error| error.to_string())?;
     }
-    let home = std::env::var_os("HOME").map(PathBuf::from).ok_or_else(|| {
-        "HOME is unavailable; cannot resolve HyprTrack data directory.".to_string()
-    })?;
-    Ok(home.join(".local/share/com.hyprtrack.desktop"))
-}
 
-fn run_collector_service() -> Result<(), String> {
-    let database_path = fallback_app_data_dir()?.join("hyprtrack.db");
-    prepare_database(&database_path, legacy_database_candidate().as_deref())?;
-    collector::run_service(database_path)
-}
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
 
-fn is_collector_service_launch() -> bool {
-    std::env::args().any(|argument| argument == "--collector-service")
+        let mut permissions = fs::metadata(&script_path)
+            .map_err(|error| error.to_string())?
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&script_path, permissions).map_err(|error| error.to_string())?;
+    }
+
+    Ok(script_path)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    if is_collector_service_launch() {
-        if let Err(error) = run_collector_service() {
-            eprintln!("HyprTrack collector service stopped: {error}");
-            std::process::exit(1);
-        }
-        return;
-    }
-
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window_impl(app);
@@ -208,10 +187,17 @@ pub fn run() {
             if let Err(error) = configure_appimage_desktop_integration() {
                 eprintln!("HyprTrack could not install its application launcher: {error}");
             }
-            let app_data_dir = app.path().app_data_dir()?;
-            let database_path = app_data_dir.join("hyprtrack.db");
+
+            let collector_script =
+                install_collector_script().map_err(std::io::Error::other)?;
+            eprintln!(
+                "HyprTrack collector script is available at {}.",
+                collector_script.display()
+            );
+
+            let database_path = collector_database_path().map_err(std::io::Error::other)?;
             let migration =
-                prepare_database(&database_path, legacy_database_candidate().as_deref())
+                prepare_database(&database_path, old_app_data_database_candidate().as_deref())
                     .map_err(std::io::Error::other)?;
             match migration {
                 MigrationResult::Imported { rows } => {
@@ -219,11 +205,8 @@ pub fn run() {
                 }
                 MigrationResult::Created | MigrationResult::Existing => {}
             }
+
             app.manage(AppState { database_path });
-            if let Err(error) = tracking_service::install().and_then(|_| tracking_service::start())
-            {
-                eprintln!("HyprTrack could not start its user service: {error}");
-            }
             build_tray(app.handle())?;
             Ok(())
         })
@@ -240,11 +223,6 @@ pub fn run() {
             get_activity,
             get_applications,
             get_health,
-            get_tracking_service_status,
-            install_tracking_service,
-            start_tracking_service,
-            restart_tracking_service,
-            uninstall_tracking_service,
             show_main_window,
         ])
         .build(tauri::generate_context!())

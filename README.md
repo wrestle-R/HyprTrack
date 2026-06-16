@@ -1,12 +1,12 @@
 # HyprTrack Desktop
 
 HyprTrack is a standalone Arch Linux desktop application for local Hyprland
-activity tracking. A persistent `systemd --user` service listens to Hyprland
-window events, stores timed activity intervals in a private SQLite database,
-and the Tauri application presents overview, activity, application, and
-productivity dashboards.
+activity tracking. The Tauri desktop app shows the dashboard and exports a
+Python collector script that listens to Hyprland window events and writes timed
+activity intervals to a local SQLite database.
 
-No Python runtime, web server, account, or network service is required.
+No account, web server, or network service is required. All activity data stays
+on your machine.
 
 ## Screenshots
 
@@ -22,7 +22,7 @@ No Python runtime, web server, account, or network service is required.
 
 - x86_64 Arch Linux
 - Hyprland with a working `hyprctl`
-- A working `systemd --user` session
+- Python 3.10 or newer
 - A working system tray/status notifier
 - WebKitGTK and GTK runtime libraries
 
@@ -31,93 +31,119 @@ is not uploaded anywhere.
 
 ## Install On Arch Linux
 
-The current release is `v0.1.5`. Download the AppImage into a permanent
+The current release is `v0.1.6`. Download the AppImage into a permanent
 location:
 
 ```bash
 mkdir -p ~/.local/bin
 wget -O ~/.local/bin/hyprtrack-desktop.AppImage \
-  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.5/HyprTrack.Desktop_0.1.5_amd64.AppImage
+  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.6/HyprTrack.Desktop_0.1.6_amd64.AppImage
 chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
 ```
 
-The final command launches HyprTrack and registers **HyprTrack Desktop** in the
-current user's application launcher with its icon. Keep the AppImage at this
-path because both the launcher and background service record its location. If
-you move it later, launch it manually from the new path and use **Install
-Service** in Settings to rewrite the service unit.
+The final command launches HyprTrack, registers **HyprTrack Desktop** in the
+current user's application launcher with its icon, and exports the collector to:
 
-First launch creates the local database and installs, enables, and starts this
-user service:
-
-```bash
-systemctl --user enable --now hyprtrack-tracker.service
+```text
+~/.local/bin/hyprtrack/collector/hyprtrack-monitor.py
 ```
 
-You can inspect it with:
+The dashboard reads this database:
 
-```bash
-systemctl --user status hyprtrack-tracker.service
-journalctl --user -u hyprtrack-tracker.service -n 100 --no-pager
+```text
+~/.local/bin/hyprtrack/collector/hyprtrack.db
 ```
 
-Tracking resumes after you log into a Hyprland session. Closing or force
-quitting the desktop window does not stop the service.
+Keep the AppImage at this path if you want the launcher entry to keep working.
+If you move the AppImage later, launch it manually from the new path once so
+HyprTrack can refresh the desktop entry.
 
-To remove the AppImage:
+## Start Tracking From Hyprland
 
-```bash
-rm ~/.local/bin/hyprtrack-desktop.AppImage
-rm ~/.local/share/applications/hyprtrack-desktop.desktop
-rm ~/.local/share/icons/hicolor/128x128/apps/hyprtrack-desktop.png
+Add the collector to your Hyprland autostart config after launching the
+AppImage once. If you use the custom Lua config loaded from
+`~/.config/hypr/custom/execs.lua`, add this inside the
+`hyprland.start` block:
+
+```lua
+hl.exec_cmd("$HOME/.local/bin/hyprtrack/collector/hyprtrack-monitor.py")
 ```
 
-Disable and remove the user service before removing the AppImage:
+For a fresh `~/.config/hypr/custom/execs.lua`, the file can look like this:
+
+```lua
+hl.on("hyprland.start", function ()
+    hl.exec_cmd("$HOME/.local/bin/hyprtrack/collector/hyprtrack-monitor.py")
+end)
+```
+
+The collector keeps running after the desktop window is closed. It stores
+timestamps in IST (`+05:30`), records active browser title changes immediately,
+and uses a lock file beside the database to avoid duplicate writers.
+
+## Run From The CLI
+
+Run the exported collector directly:
 
 ```bash
-systemctl --user disable --now hyprtrack-tracker.service
-rm ~/.config/systemd/user/hyprtrack-tracker.service
-systemctl --user daemon-reload
+~/.local/bin/hyprtrack/collector/hyprtrack-monitor.py
+```
+
+Record one sample for testing:
+
+```bash
+~/.local/bin/hyprtrack/collector/hyprtrack-monitor.py --once
+```
+
+Use a different database:
+
+```bash
+~/.local/bin/hyprtrack/collector/hyprtrack-monitor.py --db /path/to/hyprtrack.db
+```
+
+## Inspect The Data
+
+Using the SQLite command-line client:
+
+```bash
+sqlite3 ~/.local/bin/hyprtrack/collector/hyprtrack.db \
+  "SELECT sampled_at, ended_at, last_seen_at, app_class, window_title FROM activity_samples ORDER BY sampled_at DESC LIMIT 20;"
+```
+
+Summarize completed duration by application:
+
+```bash
+sqlite3 ~/.local/bin/hyprtrack/collector/hyprtrack.db \
+  "SELECT app_class, ROUND(SUM((julianday(COALESCE(ended_at, last_seen_at)) - julianday(sampled_at)) * 1440), 1) AS minutes FROM activity_samples WHERE COALESCE(ended_at, last_seen_at) IS NOT NULL GROUP BY app_class ORDER BY minutes DESC;"
 ```
 
 ## Uninstall
 
-Disable the user service, quit HyprTrack from its tray menu, and remove the
-AppImage:
-
-```bash
-systemctl --user disable --now hyprtrack-tracker.service
-rm ~/.config/systemd/user/hyprtrack-tracker.service
-systemctl --user daemon-reload
-```
+Quit HyprTrack from its tray menu and remove the AppImage, launcher, icon,
+collector, and local dashboard data:
 
 ```bash
 rm ~/.local/bin/hyprtrack-desktop.AppImage
 rm ~/.local/share/applications/hyprtrack-desktop.desktop
+rm ~/.local/share/applications/com.hyprtrack.desktop
 rm ~/.local/share/icons/hicolor/128x128/apps/hyprtrack-desktop.png
+rm -rf ~/.local/bin/hyprtrack
+rm -rf ~/.local/share/com.hyprtrack.desktop
 ```
 
-Application data remains in:
-
-```text
-~/.local/share/com.hyprtrack.desktop
-```
-
-Delete that directory only when you also want to permanently erase tracking
-history and preferences.
+Remove the Hyprland `hl.exec_cmd(...)` line manually from your exec config if
+you added it.
 
 ## Troubleshooting
 
-- No new activity: verify the service is running with
-  `systemctl --user status hyprtrack-tracker.service`.
+- No new activity: verify the collector is running with
+  `pgrep -af hyprtrack-monitor.py`.
 - Hyprland connection errors: verify `hyprctl activewindow -j` works in the
-  same session, then use **Restart Service** in Settings.
-- Service logs: run
-  `journalctl --user -u hyprtrack-tracker.service -n 100 --no-pager`.
+  same session.
+- Duplicate collector warning: stop the older `hyprtrack-monitor.py` process
+  before starting another one against the same database.
 - App starts but has no tray icon: enable a StatusNotifier-compatible tray.
-- AppImage service breaks after moving it: launch it manually from the new path
-  and use **Install Service** in Settings.
 
 ## License
 

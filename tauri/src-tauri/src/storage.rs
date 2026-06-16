@@ -120,19 +120,6 @@ pub fn prepare_database(
     Ok(MigrationResult::Created)
 }
 
-pub fn recover_interrupted_activity(database_path: &Path) -> Result<usize, String> {
-    initialize_database(database_path)?;
-    Connection::open(database_path)
-        .map_err(|error| error.to_string())?
-        .execute(
-            "UPDATE activity_samples
-             SET ended_at = last_seen_at
-             WHERE ended_at IS NULL AND last_seen_at IS NOT NULL",
-            [],
-        )
-        .map_err(|error| error.to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

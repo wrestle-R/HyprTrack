@@ -75,19 +75,3 @@ export type HealthData = {
 }
 
 export type DesktopPage = "overview" | "activity" | "applications" | "settings"
-export type TrackingServiceState =
-  | "running"
-  | "stopped"
-  | "starting"
-  | "restarting"
-  | "failed"
-
-export type TrackingServiceStatus = {
-  state: TrackingServiceState
-  pid: number | null
-  message: string
-  lastError: string | null
-  journalExcerpt: string[]
-  installed: boolean
-  enabled: boolean
-}
