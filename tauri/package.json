@@ -1,7 +1,7 @@
 {
   "name": "hyprtrack-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:release": "bash scripts/test-release-packaging.sh",
+    "release:linux": "bash scripts/build-linux-release.sh"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.2.0",
