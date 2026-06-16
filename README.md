@@ -35,7 +35,7 @@ location:
 ```bash
 mkdir -p ~/.local/bin
 wget -O ~/.local/bin/hyprtrack-desktop.AppImage \
-  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.3/HyprTrack.Desktop_0.1.4_amd64.AppImage
+  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.4/HyprTrack.Desktop_0.1.4_amd64.AppImage
 chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
 ```
