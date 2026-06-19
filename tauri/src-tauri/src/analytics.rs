@@ -1,6 +1,6 @@
 use chrono::{DateTime, Datelike, Duration, FixedOffset, TimeZone, Timelike, Utc};
 use rusqlite::{Connection, OpenFlags};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 const RANGE_TODAY: &str = "today";
 const RANGE_7D: &str = "7d";
@@ -20,6 +20,17 @@ struct ActivitySample {
     ended_at: Option<DateTime<FixedOffset>>,
     app_class: String,
     window_title: String,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MappingRule {
+    #[serde(rename = "id")]
+    pub _id: String,
+    pub match_text: String,
+    pub display_label: String,
+    pub enabled: bool,
+    pub is_default: bool,
 }
 
 fn normalize_native_app_label(class_key: &str) -> Option<&'static str> {
@@ -79,12 +90,33 @@ fn is_probable_chatgpt_conversation_title(title: &str) -> bool {
         && stripped.split_whitespace().count() >= 3
 }
 
-fn normalize_display_labels(
+fn normalize_display_labels_with_mappings(
     app_class: &str,
     window_title: &str,
     window_full: Option<&str>,
+    mapping_rules: &[MappingRule],
 ) -> (String, String) {
     let class_key = app_class.trim().to_lowercase();
+    let normalized_app_class = normalize_native_app_label(&class_key)
+        .unwrap_or(app_class)
+        .to_string();
+    let source_title = window_full
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(window_title);
+    let folded_source_title = source_title.to_lowercase();
+
+    for default_group in [false, true] {
+        if let Some(rule) = mapping_rules.iter().find(|rule| {
+            rule.enabled
+                && rule.is_default == default_group
+                && !rule.match_text.trim().is_empty()
+                && folded_source_title.contains(&rule.match_text.trim().to_lowercase())
+        }) {
+            return (normalized_app_class, rule.display_label.trim().to_string());
+        }
+    }
+
     if let Some(label) = normalize_native_app_label(&class_key) {
         let next_title = if window_title.trim().eq_ignore_ascii_case(&class_key) {
             label.to_string()
@@ -103,6 +135,10 @@ fn normalize_display_labels(
         &resolve_browser_source_title(&class_key, window_title, window_full),
     );
     let folded_title = raw_title.to_lowercase();
+
+    if folded_title == "your repositories" {
+        return (app_class.to_string(), "GitHub".to_string());
+    }
 
     if matches!(
         folded_title.as_str(),
@@ -134,7 +170,11 @@ fn normalize_display_labels(
         }
     }
 
-    let is_repo = regex_like_repository(&raw_title) || regex_like_repository_context(&raw_title);
+    let is_repo = regex_like_repository(&raw_title)
+        || regex_like_repository_context(&raw_title)
+        || raw_title
+            .split_once(':')
+            .is_some_and(|(repository, _)| regex_like_repository(repository.trim()));
     if is_repo {
         return (app_class.to_string(), "GitHub".to_string());
     }
@@ -368,6 +408,7 @@ fn add_minute(sampled_at: &DateTime<FixedOffset>) -> DateTime<FixedOffset> {
 fn read_samples(
     connection: &Connection,
     range: &EffectiveRange,
+    mapping_rules: &[MappingRule],
 ) -> Result<Vec<ActivitySample>, String> {
     let mut statement = connection
         .prepare("PRAGMA table_info(activity_samples)")
@@ -465,8 +506,12 @@ fn read_samples(
             continue;
         }
 
-        let (app_class, window_title) =
-            normalize_display_labels(&app_class, &window_title, window_full.as_deref());
+        let (app_class, window_title) = normalize_display_labels_with_mappings(
+            &app_class,
+            &window_title,
+            window_full.as_deref(),
+            mapping_rules,
+        );
 
         samples.push(ActivitySample {
             sampled_at: clipped_start,
@@ -714,7 +759,7 @@ fn calculate_last_hour_coverage(
         label: "Last 60 minutes".into(),
     };
     let tracked_minutes = round_minutes(
-        read_samples(connection, &range)?
+        read_samples(connection, &range, &[])?
             .iter()
             .map(sample_minutes)
             .sum(),
@@ -762,10 +807,14 @@ fn calculate_streak(connection: &Connection, end: &DateTime<FixedOffset>) -> Res
     Ok(streak)
 }
 
-pub fn read_overview(database_path: &str, range_key: &str) -> Result<OverviewData, String> {
+pub fn read_overview(
+    database_path: &str,
+    range_key: &str,
+    mapping_rules: &[MappingRule],
+) -> Result<OverviewData, String> {
     let connection = open_database(database_path)?;
     let range = resolve_range(range_key)?;
-    let samples = read_samples(&connection, &range)?;
+    let samples = read_samples(&connection, &range, mapping_rules)?;
     let applications = build_applications(&samples);
     let recent_sessions = build_sessions(&samples)
         .into_iter()
@@ -799,10 +848,11 @@ pub fn read_activity(
     search: Option<String>,
     page: usize,
     page_size: usize,
+    mapping_rules: &[MappingRule],
 ) -> Result<ActivityData, String> {
     let connection = open_database(database_path)?;
     let range = resolve_range(range_key)?;
-    let samples = read_samples(&connection, &range)?;
+    let samples = read_samples(&connection, &range, mapping_rules)?;
     let mut app_classes = samples
         .iter()
         .map(|sample| sample.app_class.clone())
@@ -856,10 +906,11 @@ pub fn read_applications(
     database_path: &str,
     range_key: &str,
     search: Option<String>,
+    mapping_rules: &[MappingRule],
 ) -> Result<ApplicationsData, String> {
     let connection = open_database(database_path)?;
     let range = resolve_range(range_key)?;
-    let samples = read_samples(&connection, &range)?;
+    let samples = read_samples(&connection, &range, mapping_rules)?;
     let normalized_search = search.unwrap_or_default().trim().to_lowercase();
     let items = build_applications(&samples)
         .into_iter()
@@ -905,6 +956,53 @@ mod tests {
     use crate::storage::initialize_database;
     use rusqlite::Connection;
     use tempfile::tempdir;
+
+    #[test]
+    fn github_history_is_normalized_before_the_chatgpt_fallback() {
+        assert_eq!(
+            normalize_display_labels_with_mappings(
+                "zen",
+                "Your Repositories",
+                Some("Your Repositories — Zen Browser"),
+                &[],
+            ),
+            ("zen".to_string(), "GitHub".to_string()),
+        );
+        assert_eq!(
+            normalize_display_labels_with_mappings(
+                "zen",
+                "ChatGPT",
+                Some(
+                    "wrestle-R/dots-hyprland: Usability-first dotfiles — Zen Browser"
+                ),
+                &[],
+            ),
+            ("zen".to_string(), "GitHub".to_string()),
+        );
+    }
+
+    #[test]
+    fn custom_mapping_rules_override_builtin_normalization() {
+        let rules = vec![MappingRule {
+            _id: "custom-dotfiles".to_string(),
+            match_text: "dots-hyprland".to_string(),
+            display_label: "Dotfiles".to_string(),
+            enabled: true,
+            is_default: false,
+        }];
+
+        assert_eq!(
+            normalize_display_labels_with_mappings(
+                "zen",
+                "GitHub",
+                Some(
+                    "wrestle-R/dots-hyprland: Usability-first dotfiles — Zen Browser"
+                ),
+                &rules,
+            ),
+            ("zen".to_string(), "Dotfiles".to_string()),
+        );
+    }
 
     #[test]
     fn last_hour_coverage_caps_open_interval_at_last_seen() {

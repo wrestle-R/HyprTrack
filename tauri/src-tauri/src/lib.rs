@@ -6,7 +6,7 @@ use std::{fs, path::PathBuf};
 
 use analytics::{
     read_activity, read_applications, read_health, read_overview, ActivityData, ApplicationsData,
-    HealthData, OverviewData,
+    HealthData, MappingRule, OverviewData,
 };
 use desktop_integration::configure_appimage_desktop_integration;
 use storage::{prepare_database, MigrationResult};
@@ -30,8 +30,12 @@ fn database_string(state: &AppState) -> String {
 }
 
 #[tauri::command]
-fn get_overview(range: String, state: State<'_, AppState>) -> Result<OverviewData, String> {
-    read_overview(&database_string(&state), &range)
+fn get_overview(
+    range: String,
+    mapping_rules: Vec<MappingRule>,
+    state: State<'_, AppState>,
+) -> Result<OverviewData, String> {
+    read_overview(&database_string(&state), &range, &mapping_rules)
 }
 
 #[tauri::command]
@@ -41,6 +45,7 @@ fn get_activity(
     page_size: usize,
     app: Option<String>,
     search: Option<String>,
+    mapping_rules: Vec<MappingRule>,
     state: State<'_, AppState>,
 ) -> Result<ActivityData, String> {
     read_activity(
@@ -50,6 +55,7 @@ fn get_activity(
         search,
         page,
         page_size,
+        &mapping_rules,
     )
 }
 
@@ -57,9 +63,10 @@ fn get_activity(
 fn get_applications(
     range: String,
     search: Option<String>,
+    mapping_rules: Vec<MappingRule>,
     state: State<'_, AppState>,
 ) -> Result<ApplicationsData, String> {
-    read_applications(&database_string(&state), &range, search)
+    read_applications(&database_string(&state), &range, search, &mapping_rules)
 }
 
 #[tauri::command]

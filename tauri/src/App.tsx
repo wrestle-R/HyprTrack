@@ -3,6 +3,8 @@ import {
   Activity01Icon,
   Analytics01Icon,
   Home01Icon,
+  KeyboardIcon,
+  MapsEditingIcon,
   Moon02Icon,
   RefreshIcon,
   Settings01Icon,
@@ -22,6 +24,8 @@ import {
 
 import "./App.css"
 import { HyprTrackMark } from "./components/hyprtrack-mark"
+import { KeybindingsPage } from "./components/keybindings-page"
+import { MappingsPage } from "./components/mappings-page"
 import { useDesktopQuery } from "./hooks/use-desktop-query"
 import {
   getActivity,
@@ -33,6 +37,11 @@ import {
   getApplicationSourceLabel,
   type ApplicationSource,
 } from "./lib/application-source"
+import {
+  shortcutFromKeyboardEvent,
+  type ShortcutActionId,
+} from "./lib/keybindings"
+import type { MappingRule } from "./lib/mappings"
 import {
   calculateProductiveMinutes,
   formatDuration,
@@ -63,10 +72,17 @@ const PAGES: Array<{
   icon: typeof Home01Icon
 }> = [
   { id: "overview", label: "Overview", icon: Home01Icon },
-  { id: "activity", label: "Activity", icon: Activity01Icon },
   { id: "applications", label: "Applications", icon: Analytics01Icon },
+  { id: "activity", label: "Activity", icon: Activity01Icon },
+  { id: "mappings", label: "Mappings", icon: MapsEditingIcon },
   { id: "settings", label: "Settings", icon: Settings01Icon },
 ]
+
+const KEYBINDINGS_PAGE = {
+  id: "keybindings" as const,
+  label: "Keybindings",
+  icon: KeyboardIcon,
+}
 
 function useDesktopPreferences() {
   const preferences = React.useSyncExternalStore(
@@ -85,7 +101,7 @@ function useDesktopPreferences() {
       const next =
         typeof update === "function"
           ? update(current)
-          : { ...current, ...update, version: 1 as const }
+          : { ...current, ...update, version: 2 as const }
       writePreferences(next)
     },
     []
@@ -268,14 +284,16 @@ function OverviewPage({
   range,
   refreshVersion,
   productiveTitles,
+  mappingRules,
 }: {
   range: RangeKey
   refreshVersion: number
   productiveTitles: string[]
+  mappingRules: MappingRule[]
 }) {
   const query = useDesktopQuery<OverviewData>(
-    () => getOverview(range),
-    [range, refreshVersion]
+    () => getOverview(range, mappingRules),
+    [range, refreshVersion, mappingRules]
   )
 
   if (query.loading && !query.data) {
@@ -419,8 +437,7 @@ function OverviewPage({
         </div>
       </section>
 
-      <section className="split-grid">
-        <div className="panel">
+      <section className="panel full-width-panel">
           <div className="panel-header">
             <div>
               <h2>Application usage</h2>
@@ -452,40 +469,6 @@ function OverviewPage({
               </div>
             ))}
           </div>
-        </div>
-
-        <div className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Recent activity</h2>
-              <p>Consecutive matching intervals are grouped into sessions.</p>
-            </div>
-          </div>
-          <div className="table-scroll">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Application</th>
-                <th>Class</th>
-                <th>Started</th>
-                <th>Duration</th>
-              </tr>
-            </thead>
-            <tbody>
-              {query.data.recentSessions.map((session) => (
-                <tr
-                  key={`${session.startAt}-${session.appClass}-${session.windowTitle}`}
-                >
-                  <td>{session.windowTitle}</td>
-                  <td>{session.appClass}</td>
-                  <td>{formatTimestamp(session.startAt, true)}</td>
-                  <td>{formatDuration(session.durationMinutes)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </div>
       </section>
     </div>
   )
@@ -495,10 +478,12 @@ function ActivityPage({
   range,
   refreshVersion,
   compact,
+  mappingRules,
 }: {
   range: RangeKey
   refreshVersion: number
   compact: boolean
+  mappingRules: MappingRule[]
 }) {
   const [search, setSearch] = React.useState("")
   const deferredSearch = React.useDeferredValue(search)
@@ -519,8 +504,9 @@ function ActivityPage({
         search: deferredSearch || undefined,
         page,
         pageSize,
+        mappingRules,
       }),
-    [range, app, deferredSearch, page, refreshVersion]
+    [range, app, deferredSearch, page, refreshVersion, mappingRules]
   )
 
   React.useEffect(() => {
@@ -563,6 +549,7 @@ function ActivityPage({
             value={search}
             onChange={(event) => setSearch(event.currentTarget.value)}
             placeholder="Search application class or title"
+            data-page-search
           />
           <select
             className="select"
@@ -662,15 +649,17 @@ function ActivityPage({
 function ApplicationsPage({
   range,
   refreshVersion,
+  mappingRules,
 }: {
   range: RangeKey
   refreshVersion: number
+  mappingRules: MappingRule[]
 }) {
   const [search, setSearch] = React.useState("")
   const deferredSearch = React.useDeferredValue(search)
   const query = useDesktopQuery<ApplicationsData>(
-    () => getApplications(range, deferredSearch || undefined),
-    [range, deferredSearch, refreshVersion]
+    () => getApplications(range, mappingRules, deferredSearch || undefined),
+    [range, deferredSearch, refreshVersion, mappingRules]
   )
 
   if (query.loading && !query.data) {
@@ -704,6 +693,7 @@ function ApplicationsPage({
             value={search}
             onChange={(event) => setSearch(event.currentTarget.value)}
             placeholder="Search applications"
+            data-page-search
           />
           <span className="subtle-copy">
             {query.data.items.length} normalized{" "}
@@ -765,8 +755,8 @@ function SettingsPage({
   const [applicationSource, setApplicationSource] =
     React.useState<ApplicationSource>("app")
   const applications = useDesktopQuery<ApplicationsData>(
-    () => getApplications("30d"),
-    []
+    () => getApplications("30d", preferences.mappingRules),
+    [preferences.mappingRules]
   )
 
   const visibleApplications =
@@ -986,8 +976,15 @@ function App() {
   const [refreshRequestedAt, setRefreshRequestedAt] =
     React.useState<Date | null>(null)
   const [autoRefreshEnabled, setAutoRefreshEnabled] = React.useState(true)
+  const contentAreaRef = React.useRef<HTMLElement>(null)
   const range = rangeOverride ?? preferences.defaultRange
   const resolvedTheme = useResolvedTheme(preferences.theme)
+
+  React.useEffect(() => {
+    if (contentAreaRef.current) {
+      contentAreaRef.current.scrollTop = 0
+    }
+  }, [page])
 
   React.useEffect(() => {
     document.documentElement.classList.toggle("dark", resolvedTheme === "dark")
@@ -1007,6 +1004,84 @@ function App() {
     setRefreshVersion((version) => version + 1)
   }, [])
 
+  const runShortcutAction = React.useCallback(
+    (action: ShortcutActionId) => {
+      switch (action) {
+        case "navigate.overview":
+          setPage("overview")
+          return
+        case "navigate.applications":
+          setPage("applications")
+          return
+        case "navigate.activity":
+          setPage("activity")
+          return
+        case "navigate.mappings":
+          setPage("mappings")
+          return
+        case "navigate.settings":
+          setPage("settings")
+          return
+        case "navigate.keybindings":
+          setPage("keybindings")
+          return
+        case "dashboard.refresh":
+          requestRefresh()
+          return
+        case "theme.toggle":
+          updatePreferences({
+            theme: resolvedTheme === "dark" ? "light" : "dark",
+          })
+          return
+        case "autoRefresh.toggle":
+          setAutoRefreshEnabled((enabled) => !enabled)
+          return
+        case "range.today":
+          setRangeOverride("today")
+          return
+        case "range.7d":
+          setRangeOverride("7d")
+          return
+        case "range.30d":
+          setRangeOverride("30d")
+          return
+        case "search.focus":
+          window.requestAnimationFrame(() => {
+            document
+              .querySelector<HTMLInputElement>("[data-page-search]")
+              ?.focus()
+          })
+      }
+    },
+    [requestRefresh, resolvedTheme, updatePreferences]
+  )
+
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        document.activeElement?.getAttribute("data-shortcut-capture") === "true"
+      ) {
+        return
+      }
+      const shortcut = shortcutFromKeyboardEvent(event)
+      if (!shortcut) {
+        return
+      }
+      const binding = preferences.keybindings.find(
+        (candidate) =>
+          candidate.shortcut.toLocaleLowerCase() === shortcut.toLocaleLowerCase()
+      )
+      if (!binding) {
+        return
+      }
+      event.preventDefault()
+      runShortcutAction(binding.action)
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [preferences.keybindings, runShortcutAction])
+
   React.useEffect(() => {
     let unlisten: (() => void) | undefined
     void listen("hyprtrack://refresh", () => {
@@ -1020,7 +1095,10 @@ function App() {
   }, [requestRefresh])
 
   React.useEffect(() => {
-    if (!autoRefreshEnabled || page === "settings") {
+    if (
+      !autoRefreshEnabled ||
+      !["overview", "applications", "activity"].includes(page)
+    ) {
       return
     }
 
@@ -1028,7 +1106,10 @@ function App() {
     return () => window.clearInterval(interval)
   }, [autoRefreshEnabled, page, requestRefresh])
 
-  const pageTitle = PAGES.find((item) => item.id === page)?.label ?? "HyprTrack"
+  const pageTitle =
+    PAGES.find((item) => item.id === page)?.label ??
+    (page === "keybindings" ? KEYBINDINGS_PAGE.label : "HyprTrack")
+  const isDataPage = ["overview", "applications", "activity"].includes(page)
 
   return (
     <div className="desktop-shell">
@@ -1039,7 +1120,7 @@ function App() {
             <strong>HyprTrack</strong>
           </div>
         </div>
-        <nav className="nav-stack" aria-label="Desktop navigation">
+        <nav className="nav-stack" aria-label="Primary navigation">
           {PAGES.map((item) => (
             <button
               key={item.id}
@@ -1053,13 +1134,24 @@ function App() {
             </button>
           ))}
         </nav>
+        <nav className="nav-stack utility-nav" aria-label="Utility navigation">
+          <button
+            className={`nav-item ${page === "keybindings" ? "active" : ""}`}
+            type="button"
+            onClick={() => setPage("keybindings")}
+            aria-label="Keybindings"
+          >
+            <HugeiconsIcon icon={KEYBINDINGS_PAGE.icon} strokeWidth={1.8} />
+            <strong>Keybindings</strong>
+          </button>
+        </nav>
       </aside>
 
       <main className="workspace">
         <header className="topbar">
           <h2>{pageTitle}</h2>
           <div className="topbar-actions">
-            {page === "settings" ? null : (
+            {isDataPage ? (
               <>
                 <RangeControl range={range} onChange={setRangeOverride} />
                 <AutoRefreshControl
@@ -1067,24 +1159,26 @@ function App() {
                   onChange={setAutoRefreshEnabled}
                 />
               </>
-            )}
-            <button
-              className="button secondary header-button"
-              type="button"
-              onClick={requestRefresh}
-              title={
-                refreshRequestedAt
-                  ? `Last requested ${refreshRequestedAt.toLocaleTimeString()}`
-                  : "Refresh dashboard data"
-              }
-            >
-              <HugeiconsIcon
-                icon={RefreshIcon}
-                data-icon="inline-start"
-                strokeWidth={1.8}
-              />
-              <span className="header-button-label">Refresh</span>
-            </button>
+            ) : null}
+            {isDataPage ? (
+              <button
+                className="button secondary header-button"
+                type="button"
+                onClick={requestRefresh}
+                title={
+                  refreshRequestedAt
+                    ? `Last requested ${refreshRequestedAt.toLocaleTimeString()}`
+                    : "Refresh dashboard data"
+                }
+              >
+                <HugeiconsIcon
+                  icon={RefreshIcon}
+                  data-icon="inline-start"
+                  strokeWidth={1.8}
+                />
+                <span className="header-button-label">Refresh</span>
+              </button>
+            ) : null}
             <ThemeIconToggle
               isDark={resolvedTheme === "dark"}
               onToggle={() =>
@@ -1096,12 +1190,13 @@ function App() {
           </div>
         </header>
 
-        <section className="content-area">
+        <section className="content-area" ref={contentAreaRef}>
           {page === "overview" ? (
             <OverviewPage
               range={range}
               refreshVersion={refreshVersion}
               productiveTitles={preferences.productiveTitles}
+              mappingRules={preferences.mappingRules}
             />
           ) : null}
           {page === "activity" ? (
@@ -1109,18 +1204,32 @@ function App() {
               range={range}
               refreshVersion={refreshVersion}
               compact={preferences.tableDensity === "compact"}
+              mappingRules={preferences.mappingRules}
             />
           ) : null}
           {page === "applications" ? (
             <ApplicationsPage
               range={range}
               refreshVersion={refreshVersion}
+              mappingRules={preferences.mappingRules}
+            />
+          ) : null}
+          {page === "mappings" ? (
+            <MappingsPage
+              rules={preferences.mappingRules}
+              onSave={(mappingRules) => updatePreferences({ mappingRules })}
             />
           ) : null}
           {page === "settings" ? (
             <SettingsPage
               preferences={preferences}
               updatePreferences={updatePreferences}
+            />
+          ) : null}
+          {page === "keybindings" ? (
+            <KeybindingsPage
+              bindings={preferences.keybindings}
+              onSave={(keybindings) => updatePreferences({ keybindings })}
             />
           ) : null}
         </section>

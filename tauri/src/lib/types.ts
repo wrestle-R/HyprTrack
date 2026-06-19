@@ -74,4 +74,10 @@ export type HealthData = {
   latestSampleAt: string | null
 }
 
-export type DesktopPage = "overview" | "activity" | "applications" | "settings"
+export type DesktopPage =
+  | "overview"
+  | "applications"
+  | "activity"
+  | "mappings"
+  | "settings"
+  | "keybindings"

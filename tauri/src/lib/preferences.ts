@@ -1,4 +1,12 @@
 import type { RangeKey } from "./types"
+import {
+  cloneDefaultKeybindings,
+  type Keybinding,
+} from "./keybindings"
+import {
+  cloneDefaultMappingRules,
+  type MappingRule,
+} from "./mappings"
 
 export const PREFERENCES_KEY = "hyprtrack.desktop.preferences"
 
@@ -6,13 +14,15 @@ export type FontSizePreference = "small" | "default" | "large"
 export type SidebarWidthPreference = "narrow" | "default" | "wide"
 
 export type DesktopPreferences = {
-  version: 1
+  version: 2
   theme: "system" | "light" | "dark"
   defaultRange: RangeKey
   productiveTitles: string[]
   tableDensity: "compact" | "comfortable"
   fontSize: FontSizePreference
   sidebarWidth: SidebarWidthPreference
+  mappingRules: MappingRule[]
+  keybindings: Keybinding[]
 }
 
 export const FONT_SIZE_PIXELS: Record<FontSizePreference, string> = {
@@ -28,13 +38,15 @@ export const SIDEBAR_WIDTH_PIXELS: Record<SidebarWidthPreference, string> = {
 }
 
 export const DEFAULT_PREFERENCES: DesktopPreferences = {
-  version: 1,
+  version: 2,
   theme: "system",
   defaultRange: "today",
   productiveTitles: ["VS Code", "GitHub"],
   tableDensity: "comfortable",
   fontSize: "default",
   sidebarWidth: "default",
+  mappingRules: cloneDefaultMappingRules(),
+  keybindings: cloneDefaultKeybindings(),
 }
 
 function parsePreferenceDocument(value: unknown): DesktopPreferences | null {
@@ -42,9 +54,9 @@ function parsePreferenceDocument(value: unknown): DesktopPreferences | null {
     return null
   }
 
-  const candidate = value as Partial<DesktopPreferences>
+  const candidate = value as Partial<DesktopPreferences> & { version?: number }
   if (
-    candidate.version !== 1 ||
+    ![1, 2].includes(candidate.version ?? 0) ||
     !["system", "light", "dark"].includes(candidate.theme ?? "") ||
     !["today", "7d", "30d"].includes(candidate.defaultRange ?? "") ||
     !Array.isArray(candidate.productiveTitles) ||
@@ -59,7 +71,7 @@ function parsePreferenceDocument(value: unknown): DesktopPreferences | null {
   }
 
   return {
-    version: 1,
+    version: 2,
     theme: candidate.theme as DesktopPreferences["theme"],
     defaultRange:
       candidate.defaultRange as DesktopPreferences["defaultRange"],
@@ -68,6 +80,14 @@ function parsePreferenceDocument(value: unknown): DesktopPreferences | null {
       candidate.tableDensity as DesktopPreferences["tableDensity"],
     fontSize: candidate.fontSize ?? DEFAULT_PREFERENCES.fontSize,
     sidebarWidth: candidate.sidebarWidth ?? DEFAULT_PREFERENCES.sidebarWidth,
+    mappingRules:
+      candidate.version === 2 && Array.isArray(candidate.mappingRules)
+        ? candidate.mappingRules
+        : cloneDefaultMappingRules(),
+    keybindings:
+      candidate.version === 2 && Array.isArray(candidate.keybindings)
+        ? candidate.keybindings
+        : cloneDefaultKeybindings(),
   }
 }
 

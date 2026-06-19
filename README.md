@@ -31,13 +31,13 @@ is not uploaded anywhere.
 
 ## Install On Arch Linux
 
-The current release is `v0.1.6`. Download the AppImage into a permanent
+The current release is `v0.1.7`. Download the AppImage into a permanent
 location:
 
 ```bash
 mkdir -p ~/.local/bin
 wget -O ~/.local/bin/hyprtrack-desktop.AppImage \
-  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.6/HyprTrack.Desktop_0.1.6_amd64.AppImage
+  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.7/HyprTrack.Desktop_0.1.7_amd64.AppImage
 chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
 ```
@@ -81,6 +81,20 @@ end)
 The collector keeps running after the desktop window is closed. It stores
 timestamps in IST (`+05:30`), records active browser title changes immediately,
 and uses a lock file beside the database to avoid duplicate writers.
+
+## Desktop Features
+
+- Overview, application rankings, and grouped activity sessions
+- Editable title mappings that clean up current and historical dashboard labels
+  without rewriting the SQLite database
+- App-local keybindings with duplicate and unsafe-shortcut validation
+- Light, dark, font-size, sidebar-width, date-range, and productive-label
+  preferences
+
+Mappings and keybindings are stored locally with the desktop preferences.
+Shortcuts work only while the HyprTrack window is focused. Super/Meta shortcuts
+are intentionally unsupported so HyprTrack does not conflict with Hyprland
+global bindings.
 
 ## Run From The CLI
 

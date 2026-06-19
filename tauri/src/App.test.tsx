@@ -106,14 +106,20 @@ describe("App", () => {
     render(<App />)
 
     expect(await screen.findByRole("heading", { name: "Overview" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Activity" })).toBeInTheDocument()
+    const primaryNavigation = screen.getByRole("navigation", {
+      name: "Primary navigation",
+    })
     expect(
-      screen.getByRole("button", { name: "Applications" })
-    ).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument()
+      Array.from(primaryNavigation.querySelectorAll("button")).map(
+        (button) => button.textContent
+      )
+    ).toEqual(["Overview", "Applications", "Activity", "Mappings", "Settings"])
+    expect(
+      screen.getByRole("navigation", { name: "Utility navigation" })
+    ).toHaveTextContent("Keybindings")
     expect(screen.getByText("Auto 1m")).toBeInTheDocument()
     expect(screen.getByLabelText("Use dark theme")).toBeInTheDocument()
+    expect(screen.queryByText("Recent activity")).not.toBeInTheDocument()
     expect(
       screen.queryByText("Welcome to Tauri + React")
     ).not.toBeInTheDocument()
@@ -154,5 +160,50 @@ describe("App", () => {
     expect(await screen.findByText("Last 60 minutes")).toBeInTheDocument()
     expect(screen.getByText("42 minutes tracked")).toBeInTheDocument()
     expect(screen.getByText("18 minutes untracked")).toBeInTheDocument()
+  })
+
+  it("validates new mappings before allowing them to be saved", async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+    await user.click(await screen.findByRole("button", { name: "Mappings" }))
+    await user.click(
+      screen.getByRole("button", {
+        name: "Add mapping",
+      })
+    )
+
+    expect(screen.getByText("Match text is required.")).toBeInTheDocument()
+    expect(screen.getByText("Display label is required.")).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Save mappings" })
+    ).toBeDisabled()
+  })
+
+  it("runs configured shortcuts only inside the app window", async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+    await screen.findByRole("heading", { name: "Overview" })
+    await user.keyboard("{Control>}{Alt>}2{/Alt}{/Control}")
+
+    expect(
+      await screen.findAllByRole("heading", { name: "Applications" })
+    ).not.toHaveLength(0)
+  })
+
+  it("returns the content viewport to the top when changing pages", async () => {
+    const user = userEvent.setup()
+
+    const { container } = render(<App />)
+    await screen.findByRole("heading", { name: "Overview" })
+    const content = container.querySelector<HTMLElement>(".content-area")
+    expect(content).not.toBeNull()
+    if (!content) return
+    content.scrollTop = 240
+
+    await user.click(screen.getByRole("button", { name: "Mappings" }))
+
+    expect(content.scrollTop).toBe(0)
   })
 })
