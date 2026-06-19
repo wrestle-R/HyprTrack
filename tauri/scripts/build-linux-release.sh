@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APPIMAGE_PLUGIN="${APPIMAGE_PLUGIN:-$HOME/.cache/tauri/linuxdeploy-plugin-appimage.AppImage}"
+APPIMAGE_RUNTIME_CACHE="${APPIMAGE_RUNTIME_CACHE:-$HOME/.cache/tauri/runtime-x86_64}"
+APPIMAGE_RUNTIME_SOURCE="${APPIMAGE_RUNTIME_SOURCE:-$HOME/.local/bin/hyprtrack-desktop.AppImage}"
 
 usage() {
   cat <<'USAGE'
@@ -59,6 +61,35 @@ APP_RUN
   fi
 }
 
+prepare_appimage_runtime() {
+  local offset
+  local temporary_runtime
+
+  if [[ -n "${LDAI_RUNTIME_FILE:-}" && -f "$LDAI_RUNTIME_FILE" ]]; then
+    return
+  fi
+  if [[ -f "$APPIMAGE_RUNTIME_CACHE" ]]; then
+    export LDAI_RUNTIME_FILE="$APPIMAGE_RUNTIME_CACHE"
+    return
+  fi
+  if [[ ! -x "$APPIMAGE_RUNTIME_SOURCE" ]]; then
+    return
+  fi
+
+  offset="$("$APPIMAGE_RUNTIME_SOURCE" --appimage-offset 2>/dev/null || true)"
+  if [[ ! "$offset" =~ ^[0-9]+$ || "$offset" -le 0 ]]; then
+    return
+  fi
+
+  mkdir -p "$(dirname "$APPIMAGE_RUNTIME_CACHE")"
+  temporary_runtime="${APPIMAGE_RUNTIME_CACHE}.tmp"
+  head -c "$offset" "$APPIMAGE_RUNTIME_SOURCE" > "$temporary_runtime"
+  chmod +x "$temporary_runtime"
+  mv "$temporary_runtime" "$APPIMAGE_RUNTIME_CACHE"
+  export LDAI_RUNTIME_FILE="$APPIMAGE_RUNTIME_CACHE"
+  echo "Using cached AppImage runtime: $LDAI_RUNTIME_FILE"
+}
+
 if [[ "${1:-}" == "--patch-appdir" ]]; then
   if [[ $# -ne 2 ]]; then
     usage >&2
@@ -110,6 +141,8 @@ if [[ ! -x "$APPIMAGE_PLUGIN" ]]; then
   echo "Tauri did not download linuxdeploy-plugin-appimage during the AppImage build." >&2
   exit 1
 fi
+
+prepare_appimage_runtime
 
 rm -f "$appimage_dir"/*.AppImage
 (

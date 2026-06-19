@@ -31,13 +31,13 @@ is not uploaded anywhere.
 
 ## Install On Arch Linux
 
-The current release is `v0.1.8`. Download the AppImage into a permanent
+The current release is `v0.1.9`. Download the AppImage into a permanent
 location:
 
 ```bash
 mkdir -p ~/.local/bin
 wget -O ~/.local/bin/hyprtrack-desktop.AppImage \
-  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.8/HyprTrack.Desktop_0.1.8_amd64.AppImage
+  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.9/HyprTrack.Desktop_0.1.9_amd64.AppImage
 chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
 ```
@@ -95,6 +95,63 @@ Mappings and keybindings are stored locally with the desktop preferences.
 Shortcuts work only while the HyprTrack window is focused. Super/Meta shortcuts
 are intentionally unsupported so HyprTrack does not conflict with Hyprland
 global bindings.
+
+## Version History
+
+### v0.1.1 — The desktop era begins
+
+HyprTrack moved from a separate Next.js dashboard and Python collector into a
+standalone Tauri application with local SQLite storage, tray behavior, CI, and
+release bundles. The project stopped being “a script plus a website” and
+started pretending to be a proper desktop app.
+
+### v0.1.2 — A desktop app should probably have an icon
+
+Added desktop-launcher integration, the application icon, Arch-specific install
+instructions, and the first light and dark screenshots. Turns out users enjoy
+finding an installed application without launching it from a mystery path.
+
+### v0.1.3 — Documentation learns the current version
+
+Corrected the README installation URL and release references. Small release,
+important lesson: documentation that confidently downloads the previous
+version is technically documentation, but not particularly helpful.
+
+### v0.1.4 — Packaging becomes reproducible
+
+Added the Linux release builder, AppImage patching checks, automated packaging
+tests, and SHA-256 manifests for AppImage, DEB, and RPM artifacts.
+
+### v0.1.5 — Tracking survives the window
+
+Separated collection from the GUI with a persistent `systemd --user` service,
+service controls, coverage reporting, and restart diagnostics. Closing the
+dashboard no longer meant accidentally clocking out.
+
+### v0.1.6 — Back to Python, but intentionally
+
+Replaced the service experiment with an exported event-driven Python collector
+started by Hyprland. This kept recording independent from the GUI while making
+installation, debugging, and title-change tracking substantially simpler.
+
+### v0.1.7 — The dashboard gets controls
+
+Added editable title mappings, app-local keybindings, preference migration,
+font and sidebar sizing, productive-label controls, and refreshed screenshots.
+Settings finally became settings instead of decorative suggestions.
+
+### v0.1.8 — Personal analytics arrive
+
+Added focus quality, configurable focus thresholds, period comparisons,
+activity insights, a redesigned Activity rhythm chart, and a dedicated
+Insights page. I remembered the analytics before remembering that a heatmap
+also has to fit inside its own card.
+
+### v0.1.9 — The UI remembers windows have different sizes
+
+Rebuilt Weekly rhythm as a responsive activity rail, improved layouts across
+narrow and wide windows, removed visible scrollbar clutter, restored the subtle
+checker texture without the colored glow, and refreshed the README screenshots.
 
 ## Run From The CLI
 

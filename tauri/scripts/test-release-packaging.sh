@@ -7,8 +7,13 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 VERSION="$(node -e 'const fs=require("fs"); console.log(JSON.parse(fs.readFileSync("src-tauri/tauri.conf.json","utf8")).version)')"
 EXPECTED_APPIMAGE="HyprTrack.Desktop_${VERSION}_amd64.AppImage"
 
-if [[ "$EXPECTED_APPIMAGE" != "HyprTrack.Desktop_0.1.8_amd64.AppImage" ]]; then
+if [[ "$EXPECTED_APPIMAGE" != "HyprTrack.Desktop_0.1.9_amd64.AppImage" ]]; then
   echo "Unexpected release AppImage name: $EXPECTED_APPIMAGE"
+  exit 1
+fi
+
+if ! grep -Fq 'LDAI_RUNTIME_FILE' "$ROOT_DIR/scripts/build-linux-release.sh"; then
+  echo "Release builder does not provide an offline AppImage runtime fallback"
   exit 1
 fi
 

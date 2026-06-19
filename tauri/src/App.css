@@ -28,7 +28,18 @@
   line-height: 1.5;
   font-weight: 400;
   color: var(--foreground);
-  background: var(--background);
+  background:
+    linear-gradient(
+      color-mix(in oklab, var(--foreground) 3.2%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--foreground) 3.2%, transparent) 1px,
+      transparent 1px
+    ),
+    var(--background);
+  background-size: 32px 32px;
   font-synthesis: none;
   color-scheme: light;
   text-rendering: optimizeLegibility;
@@ -61,7 +72,18 @@
   --danger: oklch(0.7 0.17 25);
   color-scheme: dark;
   color: var(--foreground);
-  background: var(--background);
+  background:
+    linear-gradient(
+      color-mix(in oklab, var(--foreground) 4%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--foreground) 4%, transparent) 1px,
+      transparent 1px
+    ),
+    var(--background);
+  background-size: 32px 32px;
 }
 
 * {
@@ -75,7 +97,7 @@ body {
   height: 100%;
   overflow: hidden;
   color: var(--foreground);
-  background: var(--background);
+  background: transparent;
 }
 
 button,
@@ -413,6 +435,19 @@ select:focus-visible {
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.content-area::-webkit-scrollbar,
+.table-scroll::-webkit-scrollbar,
+.sidebar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.table-scroll,
+.sidebar {
+  scrollbar-width: none;
 }
 
 .hero-panel,
@@ -713,59 +748,134 @@ select:focus-visible {
   background: var(--muted);
 }
 
-.heatmap-scroll {
-  width: 100%;
-  overflow-x: auto;
-  padding-bottom: 0.25rem;
+.rhythm-rail {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid color-mix(in oklab, var(--primary) 14%, var(--border));
+  border-radius: 1.15rem;
+  background: color-mix(in oklab, var(--muted) 38%, var(--card));
 }
 
-.rhythm-heatmap {
-  min-width: 48rem;
+.rhythm-rail-summary,
+.rhythm-scale,
+.rhythm-row {
   display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.heatmap-axis-row,
-.heatmap-row {
-  display: grid;
-  grid-template-columns: 3.2rem repeat(24, minmax(1.35rem, 1fr));
-  gap: 0.26rem;
   align-items: center;
 }
 
-.heatmap-axis-row span {
+.rhythm-rail-summary {
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.rhythm-rail-summary > div:first-child span,
+.rhythm-rail-summary > div:first-child strong {
+  display: block;
+}
+
+.rhythm-rail-summary > div:first-child span,
+.rhythm-scale,
+.rhythm-row > strong {
   color: var(--muted-foreground);
-  font-size: 0.66rem;
+  font-size: 0.72rem;
+}
+
+.rhythm-rail-summary > div:first-child strong {
+  margin-top: 0.12rem;
+  font-family: "Bricolage Grotesque", "Outfit", sans-serif;
+  font-size: 1.05rem;
+}
+
+.rhythm-scale {
+  gap: 0.45rem;
+}
+
+.rhythm-scale i {
+  width: clamp(4rem, 10vw, 7rem);
+  height: 0.48rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--primary) 5%, var(--muted)),
+    color-mix(in oklab, var(--primary) 86%, var(--muted))
+  );
+}
+
+.rhythm-axis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0 0 0.4rem clamp(2.9rem, 8vw, 4.5rem);
+  color: var(--muted-foreground);
+  font-size: 0.65rem;
+}
+
+.rhythm-axis span:last-child {
+  text-align: right;
+}
+
+.rhythm-axis span:nth-child(2),
+.rhythm-axis span:nth-child(3) {
   text-align: center;
 }
 
-.heatmap-row strong {
-  color: var(--muted-foreground);
-  font-size: 0.72rem;
-  font-weight: 600;
+.rhythm-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
 }
 
-.rhythm-cell {
-  aspect-ratio: 1;
-  min-height: 1.4rem;
-  border: 1px solid color-mix(in oklab, var(--primary) 8%, var(--border));
-  border-radius: 0.38rem;
+.rhythm-row {
+  min-width: 0;
+  gap: 0.65rem;
+}
+
+.rhythm-row > strong {
+  width: clamp(2.25rem, 7vw, 3.85rem);
+  flex: 0 0 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rhythm-band {
+  min-width: 0;
+  height: clamp(2.4rem, 5vw, 3.5rem);
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  align-items: end;
+  gap: clamp(1px, 0.22vw, 3px);
+  padding: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: color-mix(in oklab, var(--card) 90%, transparent);
+  overflow: hidden;
+}
+
+.rhythm-segment {
+  width: 100%;
+  height: var(--rhythm-height);
+  min-height: 0.28rem;
+  border-radius: 0.25rem;
   background: color-mix(
     in oklab,
-    var(--primary) var(--cell-strength),
+    var(--primary) var(--rhythm-strength),
     var(--muted)
   );
   transition:
-    transform 120ms ease,
-    border-color 120ms ease;
+    height 180ms ease,
+    filter 140ms ease,
+    transform 140ms ease;
 }
 
-.rhythm-cell:hover,
-.rhythm-cell:focus-visible {
+.rhythm-segment:hover,
+.rhythm-segment:focus-visible {
   z-index: 2;
-  transform: scale(1.16);
-  border-color: var(--primary);
+  filter: saturate(1.15);
+  transform: translateY(-2px);
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
 }
 
 .chart-legend {
@@ -847,6 +957,7 @@ select:focus-visible {
   min-width: 0;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
+  scrollbar-gutter: auto;
 }
 
 .data-table th,
@@ -1283,6 +1394,10 @@ select:focus-visible {
   .highlight-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .hero-panel h1 {
+    font-size: clamp(1.75rem, 4vw, 2.35rem);
+  }
 }
 
 @media (max-width: 900px) {
@@ -1326,6 +1441,7 @@ select:focus-visible {
 
   .topbar-actions {
     justify-content: flex-end;
+    min-width: 0;
   }
 
   .content-area {
@@ -1334,6 +1450,14 @@ select:focus-visible {
 
   .subtle-copy {
     margin-left: 0;
+  }
+
+  .chart-frame {
+    height: clamp(17rem, 42vw, 21rem);
+  }
+
+  .rhythm-rail {
+    padding: 0.85rem;
   }
 }
 
@@ -1349,6 +1473,8 @@ select:focus-visible {
     border-bottom: 1px solid var(--sidebar-border);
     flex-direction: row;
     align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .brand-block {
@@ -1362,7 +1488,7 @@ select:focus-visible {
   }
 
   .nav-stack {
-    flex: 1;
+    flex: 0 0 auto;
     min-width: 0;
     flex-direction: row;
     justify-content: flex-end;
@@ -1464,5 +1590,128 @@ select:focus-visible {
   .panel,
   .chart-panel {
     padding-inline: 0.85rem;
+  }
+
+  .rhythm-rail-summary {
+    align-items: flex-start;
+  }
+
+  .rhythm-axis {
+    margin-left: 2.9rem;
+  }
+
+  .rhythm-row {
+    gap: 0.4rem;
+  }
+
+  .rhythm-row > strong {
+    width: 2.5rem;
+  }
+
+  .rhythm-band {
+    gap: 1px;
+    padding: 0.22rem;
+    border-radius: 0.68rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    gap: 0.75rem;
+    padding: 0.8rem;
+  }
+
+  .topbar h2 {
+    font-size: 1.28rem;
+  }
+
+  .topbar-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.5rem;
+  }
+
+  .segmented-control {
+    width: 100%;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .segmented-control button {
+    min-width: 0;
+    padding-inline: 0.5rem;
+  }
+
+  .auto-refresh-control {
+    justify-content: space-between;
+    min-width: 0;
+  }
+
+  .content-area {
+    padding: 0.65rem;
+  }
+
+  .hero-panel {
+    padding: 1.05rem;
+  }
+
+  .hero-panel h1 {
+    font-size: 1.72rem;
+  }
+
+  .hero-meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .metric-card {
+    padding: 0.85rem;
+  }
+
+  .metric-value {
+    font-size: 1.5rem;
+  }
+
+  .panel-header {
+    gap: 0.65rem;
+  }
+
+  .rhythm-rail {
+    padding: 0.7rem;
+  }
+
+  .rhythm-rail-summary {
+    flex-direction: column;
+    margin-bottom: 0.75rem;
+  }
+
+  .rhythm-scale {
+    width: 100%;
+  }
+
+  .rhythm-scale i {
+    flex: 1;
+  }
+
+  .rhythm-axis {
+    margin-left: 2.6rem;
+    font-size: 0.58rem;
+  }
+
+  .rhythm-row > strong {
+    width: 2.2rem;
+    font-size: 0.64rem;
+  }
+
+  .rhythm-band {
+    height: 2.8rem;
+  }
+
+  .focus-threshold-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .data-table {
+    min-width: 38rem;
   }
 }

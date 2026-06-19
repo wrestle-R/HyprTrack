@@ -175,6 +175,100 @@ function ComparisonCard({
   )
 }
 
+function formatHour(hour: number) {
+  if (hour === 0) return "12 AM"
+  if (hour === 12) return "12 PM"
+  return `${hour > 12 ? hour - 12 : hour} ${hour >= 12 ? "PM" : "AM"}`
+}
+
+function formatHourWindow(hour: number) {
+  const nextHour = (hour + 1) % 24
+  const start = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+  const end = nextHour === 0 ? 12 : nextHour > 12 ? nextHour - 12 : nextHour
+  const period = hour >= 12 && hour < 23 ? "PM" : nextHour === 0 ? "AM" : "AM"
+  return `${start}–${end} ${period}`
+}
+
+export function RhythmRail({ cells }: { cells: InsightsData["rhythm"] }) {
+  const maxTracked = Math.max(1, ...cells.map((cell) => cell.trackedMinutes))
+  const peak = cells.reduce<(typeof cells)[number] | null>(
+    (current, cell) =>
+      current === null || cell.trackedMinutes > current.trackedMinutes
+        ? cell
+        : current,
+    null
+  )
+  const rows = [
+    ...new Map(
+      cells.map((cell) => [
+        cell.dayIndex,
+        {
+          label: cell.dayLabel,
+          cells: cells.filter((candidate) => candidate.dayIndex === cell.dayIndex),
+        },
+      ])
+    ).values(),
+  ]
+
+  return (
+    <div className="rhythm-rail">
+      <div className="rhythm-rail-summary">
+        <div>
+          <span>Peak window</span>
+          <strong>
+            {peak && peak.trackedMinutes > 0
+              ? formatHourWindow(peak.hour)
+              : "Not enough activity"}
+          </strong>
+        </div>
+        <div className="rhythm-scale" aria-label="Activity intensity scale">
+          <span>Quiet</span>
+          <i />
+          <span>Active</span>
+        </div>
+      </div>
+      <div className="rhythm-axis" aria-hidden="true">
+        <span>12 AM</span>
+        <span>6 AM</span>
+        <span>12 PM</span>
+        <span>6 PM</span>
+      </div>
+      <div className="rhythm-rows">
+        {rows.map((row) => (
+          <div className="rhythm-row" key={row.label}>
+            <strong>{row.label}</strong>
+            <div className="rhythm-band">
+              {row.cells.map((cell) => {
+                const strength = cell.trackedMinutes / maxTracked
+                const label = `${cell.dayLabel}, ${formatHour(
+                  cell.hour
+                )}: ${formatDuration(
+                  cell.trackedMinutes
+                )} tracked, ${formatDuration(cell.focusedMinutes)} focused`
+                return (
+                  <span
+                    className="rhythm-segment"
+                    key={`${cell.dayIndex}-${cell.hour}`}
+                    tabIndex={0}
+                    aria-label={label}
+                    title={label}
+                    style={{
+                      "--rhythm-strength": `${Math.round(
+                        Math.max(0.035, strength) * 86
+                      )}%`,
+                      "--rhythm-height": `${Math.round(34 + strength * 66)}%`,
+                    } as CSSProperties}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function OverviewPage({
   range,
   refreshVersion,
@@ -471,15 +565,6 @@ export function InsightsPage({
   }
 
   const data = query.data
-  const maxRhythm = Math.max(
-    1,
-    ...data.rhythm.map((cell) => cell.trackedMinutes)
-  )
-  const dayLabels = [
-    ...new Map(
-      data.rhythm.map((cell) => [cell.dayIndex, cell.dayLabel] as const)
-    ).values(),
-  ]
 
   return (
     <div className="page-stack">
@@ -527,52 +612,10 @@ export function InsightsPage({
           <div>
             <p className="eyebrow">Recurring windows</p>
             <h2>Weekly rhythm</h2>
-            <p>Darker cells contain more tracked time.</p>
+            <p>Taller, warmer segments contain more tracked time.</p>
           </div>
         </div>
-        <div className="heatmap-scroll">
-          <div className="rhythm-heatmap">
-            <div className="heatmap-axis-row" aria-hidden="true">
-              <span />
-              {Array.from({ length: 24 }, (_, hour) => (
-                <span key={hour}>
-                  {hour % 3 === 0 ? String(hour).padStart(2, "0") : ""}
-                </span>
-              ))}
-            </div>
-            {dayLabels.map((dayLabel, dayIndex) => (
-              <div className="heatmap-row" key={dayLabel}>
-                <strong>{dayLabel}</strong>
-                {data.rhythm
-                  .filter((cell) => cell.dayIndex === dayIndex)
-                  .map((cell) => {
-                    const intensity = cell.trackedMinutes / maxRhythm
-                    const label = `${cell.dayLabel}, ${String(
-                      cell.hour
-                    ).padStart(2, "0")}:00: ${formatDuration(
-                      cell.trackedMinutes
-                    )} tracked, ${formatDuration(
-                      cell.focusedMinutes
-                    )} focused`
-                    return (
-                      <span
-                        className="rhythm-cell"
-                        key={`${cell.dayIndex}-${cell.hour}`}
-                        tabIndex={0}
-                        aria-label={label}
-                        title={label}
-                        style={{
-                          "--cell-strength": `${Math.round(
-                            Math.max(0.04, intensity) * 82
-                          )}%`,
-                        } as CSSProperties}
-                      />
-                    )
-                  })}
-              </div>
-            ))}
-          </div>
-        </div>
+        <RhythmRail cells={data.rhythm} />
       </section>
 
       <section className="panel trend-panel">
