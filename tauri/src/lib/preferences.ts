@@ -12,15 +12,21 @@ export const PREFERENCES_KEY = "hyprtrack.desktop.preferences"
 
 export type FontSizePreference = "small" | "default" | "large"
 export type SidebarWidthPreference = "narrow" | "default" | "wide"
+export type FocusThresholdMinutes = 15 | 20 | 25 | 30 | 45 | 60
+
+export const FOCUS_THRESHOLD_OPTIONS: FocusThresholdMinutes[] = [
+  15, 20, 25, 30, 45, 60,
+]
 
 export type DesktopPreferences = {
-  version: 2
+  version: 3
   theme: "system" | "light" | "dark"
   defaultRange: RangeKey
   productiveTitles: string[]
   tableDensity: "compact" | "comfortable"
   fontSize: FontSizePreference
   sidebarWidth: SidebarWidthPreference
+  focusThresholdMinutes: FocusThresholdMinutes
   mappingRules: MappingRule[]
   keybindings: Keybinding[]
 }
@@ -38,13 +44,14 @@ export const SIDEBAR_WIDTH_PIXELS: Record<SidebarWidthPreference, string> = {
 }
 
 export const DEFAULT_PREFERENCES: DesktopPreferences = {
-  version: 2,
+  version: 3,
   theme: "system",
   defaultRange: "today",
   productiveTitles: ["VS Code", "GitHub"],
   tableDensity: "comfortable",
   fontSize: "default",
   sidebarWidth: "default",
+  focusThresholdMinutes: 25,
   mappingRules: cloneDefaultMappingRules(),
   keybindings: cloneDefaultKeybindings(),
 }
@@ -54,9 +61,11 @@ function parsePreferenceDocument(value: unknown): DesktopPreferences | null {
     return null
   }
 
-  const candidate = value as Partial<DesktopPreferences> & { version?: number }
+  const candidate = value as Partial<Omit<DesktopPreferences, "version">> & {
+    version?: number
+  }
   if (
-    ![1, 2].includes(candidate.version ?? 0) ||
+    ![1, 2, 3].includes(candidate.version ?? 0) ||
     !["system", "light", "dark"].includes(candidate.theme ?? "") ||
     !["today", "7d", "30d"].includes(candidate.defaultRange ?? "") ||
     !Array.isArray(candidate.productiveTitles) ||
@@ -71,7 +80,7 @@ function parsePreferenceDocument(value: unknown): DesktopPreferences | null {
   }
 
   return {
-    version: 2,
+    version: 3,
     theme: candidate.theme as DesktopPreferences["theme"],
     defaultRange:
       candidate.defaultRange as DesktopPreferences["defaultRange"],
@@ -80,12 +89,19 @@ function parsePreferenceDocument(value: unknown): DesktopPreferences | null {
       candidate.tableDensity as DesktopPreferences["tableDensity"],
     fontSize: candidate.fontSize ?? DEFAULT_PREFERENCES.fontSize,
     sidebarWidth: candidate.sidebarWidth ?? DEFAULT_PREFERENCES.sidebarWidth,
+    focusThresholdMinutes: FOCUS_THRESHOLD_OPTIONS.includes(
+      candidate.focusThresholdMinutes as FocusThresholdMinutes
+    )
+      ? (candidate.focusThresholdMinutes as FocusThresholdMinutes)
+      : DEFAULT_PREFERENCES.focusThresholdMinutes,
     mappingRules:
-      candidate.version === 2 && Array.isArray(candidate.mappingRules)
+      (candidate.version === 2 || candidate.version === 3) &&
+      Array.isArray(candidate.mappingRules)
         ? candidate.mappingRules
         : cloneDefaultMappingRules(),
     keybindings:
-      candidate.version === 2 && Array.isArray(candidate.keybindings)
+      (candidate.version === 2 || candidate.version === 3) &&
+      Array.isArray(candidate.keybindings)
         ? candidate.keybindings
         : cloneDefaultKeybindings(),
   }

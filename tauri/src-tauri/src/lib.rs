@@ -5,8 +5,8 @@ mod storage;
 use std::{fs, path::PathBuf};
 
 use analytics::{
-    read_activity, read_applications, read_health, read_overview, ActivityData, ApplicationsData,
-    HealthData, MappingRule, OverviewData,
+    read_activity, read_applications, read_health, read_insights, read_overview, ActivityData,
+    ApplicationsData, HealthData, InsightsData, MappingRule, OverviewData,
 };
 use desktop_integration::configure_appimage_desktop_integration;
 use storage::{prepare_database, MigrationResult};
@@ -16,8 +16,7 @@ use tauri::{
     AppHandle, Emitter, Manager, State, WindowEvent,
 };
 
-const COLLECTOR_SCRIPT_BYTES: &[u8] =
-    include_bytes!("../../../collector/hyprtrack-monitor.py");
+const COLLECTOR_SCRIPT_BYTES: &[u8] = include_bytes!("../../../collector/hyprtrack-monitor.py");
 const COLLECTOR_SCRIPT_NAME: &str = "hyprtrack-monitor.py";
 const COLLECTOR_DATABASE_NAME: &str = "hyprtrack.db";
 
@@ -32,10 +31,31 @@ fn database_string(state: &AppState) -> String {
 #[tauri::command]
 fn get_overview(
     range: String,
+    focus_threshold_minutes: f64,
     mapping_rules: Vec<MappingRule>,
     state: State<'_, AppState>,
 ) -> Result<OverviewData, String> {
-    read_overview(&database_string(&state), &range, &mapping_rules)
+    read_overview(
+        &database_string(&state),
+        &range,
+        focus_threshold_minutes,
+        &mapping_rules,
+    )
+}
+
+#[tauri::command]
+fn get_insights(
+    range: String,
+    focus_threshold_minutes: f64,
+    mapping_rules: Vec<MappingRule>,
+    state: State<'_, AppState>,
+) -> Result<InsightsData, String> {
+    read_insights(
+        &database_string(&state),
+        &range,
+        focus_threshold_minutes,
+        &mapping_rules,
+    )
 }
 
 #[tauri::command]
@@ -195,8 +215,7 @@ pub fn run() {
                 eprintln!("HyprTrack could not install its application launcher: {error}");
             }
 
-            let collector_script =
-                install_collector_script().map_err(std::io::Error::other)?;
+            let collector_script = install_collector_script().map_err(std::io::Error::other)?;
             eprintln!(
                 "HyprTrack collector script is available at {}.",
                 collector_script.display()
@@ -227,6 +246,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_overview,
+            get_insights,
             get_activity,
             get_applications,
             get_health,

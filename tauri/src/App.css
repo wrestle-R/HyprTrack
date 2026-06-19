@@ -28,13 +28,7 @@
   line-height: 1.5;
   font-weight: 400;
   color: var(--foreground);
-  background:
-    linear-gradient(rgb(20 25 35 / 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(20 25 35 / 0.025) 1px, transparent 1px),
-    radial-gradient(circle at top left, rgb(247 201 119 / 0.2), transparent 24rem),
-    radial-gradient(circle at top right, rgb(95 168 184 / 0.14), transparent 28rem),
-    var(--background);
-  background-size: 32px 32px, 32px 32px, auto, auto, auto;
+  background: var(--background);
   font-synthesis: none;
   color-scheme: light;
   text-rendering: optimizeLegibility;
@@ -67,13 +61,7 @@
   --danger: oklch(0.7 0.17 25);
   color-scheme: dark;
   color: var(--foreground);
-  background:
-    linear-gradient(rgb(255 255 255 / 0.022) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.022) 1px, transparent 1px),
-    radial-gradient(circle at top left, rgb(255 193 93 / 0.12), transparent 24rem),
-    radial-gradient(circle at top right, rgb(95 168 184 / 0.12), transparent 28rem),
-    var(--background);
-  background-size: 32px 32px, 32px 32px, auto, auto, auto;
+  background: var(--background);
 }
 
 * {
@@ -87,7 +75,7 @@ body {
   height: 100%;
   overflow: hidden;
   color: var(--foreground);
-  background: transparent;
+  background: var(--background);
 }
 
 button,
@@ -545,6 +533,265 @@ select:focus-visible {
 .chart-frame {
   width: 100%;
   height: 21rem;
+}
+
+.rhythm-panel {
+  overflow: hidden;
+}
+
+.chart-summary,
+.focus-score {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.chart-summary span,
+.focus-score span {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+}
+
+.chart-summary strong {
+  display: block;
+  margin-top: 0.15rem;
+  font-family: "Bricolage Grotesque", "Outfit", sans-serif;
+  font-size: 1.1rem;
+}
+
+.chart-tooltip {
+  min-width: 10.5rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid color-mix(in oklab, var(--primary) 24%, var(--border));
+  border-radius: 0.9rem;
+  color: var(--card-foreground);
+  background: color-mix(in oklab, var(--card) 96%, transparent);
+  box-shadow: 0 18px 48px rgb(15 23 42 / 0.16);
+  backdrop-filter: blur(18px);
+}
+
+.chart-tooltip > span,
+.chart-tooltip > strong,
+.chart-tooltip > small {
+  display: block;
+}
+
+.chart-tooltip > span {
+  color: var(--muted-foreground);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.chart-tooltip > strong {
+  margin-top: 0.18rem;
+  font-family: "Bricolage Grotesque", "Outfit", sans-serif;
+  font-size: 1.25rem;
+}
+
+.chart-tooltip > small {
+  margin-top: 0.2rem;
+  color: var(--muted-foreground);
+}
+
+.tooltip-pair {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.tooltip-pair strong {
+  font-size: 0.82rem;
+}
+
+.tooltip-swatch,
+.chart-legend i {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+}
+
+.tooltip-swatch.tracked,
+.chart-legend i.tracked {
+  background: var(--muted-foreground);
+}
+
+.tooltip-swatch.focused,
+.chart-legend i.focused {
+  background: var(--primary);
+}
+
+.focus-quality-panel {
+  overflow: hidden;
+}
+
+.focus-score {
+  min-width: 8rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid color-mix(in oklab, var(--primary) 30%, var(--border));
+  border-radius: 1rem;
+  background: color-mix(in oklab, var(--primary) 8%, var(--card));
+}
+
+.focus-score strong {
+  display: block;
+  font-family: "Bricolage Grotesque", "Outfit", sans-serif;
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
+.focus-metrics-grid,
+.comparison-grid,
+.highlight-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.focus-metrics-grid .metric-card,
+.highlight-grid .metric-card {
+  box-shadow: none;
+  background: color-mix(in oklab, var(--muted) 35%, var(--card));
+}
+
+.comparison-card {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background: color-mix(in oklab, var(--card) 94%, transparent);
+  box-shadow: var(--shadow);
+}
+
+.comparison-card > span,
+.comparison-card > strong,
+.comparison-card > small {
+  display: block;
+}
+
+.comparison-card > span,
+.comparison-card > small {
+  color: var(--muted-foreground);
+}
+
+.comparison-card > span {
+  font-size: 0.82rem;
+}
+
+.comparison-card > strong {
+  margin-top: 0.3rem;
+  font-family: "Bricolage Grotesque", "Outfit", sans-serif;
+  font-size: 1.65rem;
+}
+
+.comparison-card > small {
+  margin-top: 0.2rem;
+}
+
+.comparison-delta {
+  width: fit-content;
+  margin-top: 0.55rem;
+  padding: 0.2rem 0.48rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.comparison-delta.positive {
+  color: var(--signal);
+  background: var(--signal-soft);
+}
+
+.comparison-delta.negative {
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 9%, transparent);
+}
+
+.comparison-delta.neutral {
+  color: var(--muted-foreground);
+  background: var(--muted);
+}
+
+.heatmap-scroll {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.rhythm-heatmap {
+  min-width: 48rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.heatmap-axis-row,
+.heatmap-row {
+  display: grid;
+  grid-template-columns: 3.2rem repeat(24, minmax(1.35rem, 1fr));
+  gap: 0.26rem;
+  align-items: center;
+}
+
+.heatmap-axis-row span {
+  color: var(--muted-foreground);
+  font-size: 0.66rem;
+  text-align: center;
+}
+
+.heatmap-row strong {
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.rhythm-cell {
+  aspect-ratio: 1;
+  min-height: 1.4rem;
+  border: 1px solid color-mix(in oklab, var(--primary) 8%, var(--border));
+  border-radius: 0.38rem;
+  background: color-mix(
+    in oklab,
+    var(--primary) var(--cell-strength),
+    var(--muted)
+  );
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease;
+}
+
+.rhythm-cell:hover,
+.rhythm-cell:focus-visible {
+  z-index: 2;
+  transform: scale(1.16);
+  border-color: var(--primary);
+}
+
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.insight-chart-frame {
+  height: 19rem;
+}
+
+.highlight-grid .metric-value {
+  font-size: 1.25rem;
+}
+
+.focus-threshold-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .split-grid {
@@ -1030,7 +1277,10 @@ select:focus-visible {
   .settings-grid,
   .coverage-grid,
   .collector-details,
-  .split-grid {
+  .split-grid,
+  .focus-metrics-grid,
+  .comparison-grid,
+  .highlight-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1143,7 +1393,10 @@ select:focus-visible {
   .settings-grid,
   .coverage-grid,
   .collector-details,
-  .split-grid {
+  .split-grid,
+  .focus-metrics-grid,
+  .comparison-grid,
+  .highlight-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1154,6 +1407,18 @@ select:focus-visible {
   .hero-panel {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .rhythm-panel .panel-header,
+  .focus-quality-panel .panel-header,
+  .trend-panel .panel-header {
+    flex-direction: column;
+  }
+
+  .chart-summary,
+  .focus-score {
+    width: 100%;
+    text-align: left;
   }
 
   .editor-intro,

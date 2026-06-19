@@ -46,9 +46,59 @@ vi.mock("@tauri-apps/api/core", () => ({
           },
           streakDays: 2,
           timeline: [],
-          applications: [],
+          applications: [
+            {
+              windowTitle: "VS Code",
+              appClass: "code",
+              minutes: 60,
+              share: 50,
+              sessionCount: 2,
+              firstSeen: "2026-06-14T09:00:00+05:30",
+              lastSeen: "2026-06-14T10:00:00+05:30",
+              recentSessions: [],
+            },
+          ],
           recentSessions: [],
+          focusQuality: {
+            focusedMinutes: 60,
+            continuityPercent: 50,
+            longestFocusedBlockMinutes: 42,
+            averageSessionMinutes: 20,
+            contextSwitches: 3,
+            switchesPerTrackedHour: 1.5,
+          },
           latestSampleAt: "2026-06-14T13:37:43.221+05:30",
+        }
+      case "get_insights":
+        return {
+          range: {
+            key: "today",
+            start: "2026-06-14T00:00:00+05:30",
+            end: "2026-06-14T13:37:43+05:30",
+            label: "Today",
+          },
+          comparisons: {
+            trackedMinutes: { current: 120, previous: 90, percentChange: 33.33 },
+            focusContinuity: { current: 50, previous: 40, percentChange: 25 },
+            averageSessionMinutes: {
+              current: 20,
+              previous: 18,
+              percentChange: 11.11,
+            },
+            switchesPerTrackedHour: {
+              current: 1.5,
+              previous: 2,
+              percentChange: -25,
+            },
+          },
+          rhythm: [],
+          dailyTrend: [],
+          highlights: {
+            peakWorkingWindow: "10:00–11:00",
+            strongestFocusDay: "14 Jun",
+            mostFragmentedDay: "14 Jun",
+            longestFocusedBlockMinutes: 42,
+          },
         }
       case "get_activity":
         return {
@@ -113,7 +163,14 @@ describe("App", () => {
       Array.from(primaryNavigation.querySelectorAll("button")).map(
         (button) => button.textContent
       )
-    ).toEqual(["Overview", "Applications", "Activity", "Mappings", "Settings"])
+    ).toEqual([
+      "Overview",
+      "Insights",
+      "Applications",
+      "Activity",
+      "Mappings",
+      "Settings",
+    ])
     expect(
       screen.getByRole("navigation", { name: "Utility navigation" })
     ).toHaveTextContent("Keybindings")
@@ -132,6 +189,50 @@ describe("App", () => {
       name: /refresh dashboard every minute/i,
     })
     expect(autoRefresh).toBeChecked()
+  })
+
+  it("replaces overview application usage with focus quality", async () => {
+    render(<App />)
+
+    expect(
+      await screen.findByRole("heading", { name: "Focus quality" })
+    ).toBeInTheDocument()
+    expect(screen.getByText("50%")).toBeInTheDocument()
+    expect(screen.queryByRole("heading", { name: "Application usage" })).not.toBeInTheDocument()
+  })
+
+  it("loads the Insights page with the configured focus threshold", async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+    await user.click(await screen.findByRole("button", { name: "Insights" }))
+
+    expect(
+      await screen.findByRole("heading", { name: "Weekly rhythm" })
+    ).toBeInTheDocument()
+    expect(invokeMock).toHaveBeenCalledWith(
+      "get_insights",
+      expect.objectContaining({
+        range: "today",
+        focusThresholdMinutes: 25,
+      })
+    )
+  })
+
+  it("persists a changed focus threshold and uses it for overview analytics", async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+    await user.click(await screen.findByRole("button", { name: "Settings" }))
+    await user.click(screen.getByRole("button", { name: "45m" }))
+    await user.click(screen.getByRole("button", { name: "Overview" }))
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      "get_overview",
+      expect.objectContaining({
+        focusThresholdMinutes: 45,
+      })
+    )
   })
 
   it("shows collector setup without service action buttons", async () => {

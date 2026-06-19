@@ -1,6 +1,6 @@
 [package]
 name = "hyprtrack-desktop"
-version = "0.1.7"
+version = "0.1.8"
 description = "Local Hyprland activity intelligence"
 authors = ["Russell Daniel Paul"]
 license = "MIT"

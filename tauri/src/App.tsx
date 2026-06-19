@@ -12,17 +12,12 @@ import {
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { listen } from "@tauri-apps/api/event"
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
 
 import "./App.css"
+import {
+  InsightsPage,
+  OverviewPage,
+} from "./components/analytics-pages"
 import { HyprTrackMark } from "./components/hyprtrack-mark"
 import { KeybindingsPage } from "./components/keybindings-page"
 import { MappingsPage } from "./components/mappings-page"
@@ -30,7 +25,6 @@ import { useDesktopQuery } from "./hooks/use-desktop-query"
 import {
   getActivity,
   getApplications,
-  getOverview,
 } from "./lib/desktop-api"
 import {
   getApplicationSource,
@@ -43,11 +37,11 @@ import {
 } from "./lib/keybindings"
 import type { MappingRule } from "./lib/mappings"
 import {
-  calculateProductiveMinutes,
   formatDuration,
   formatTimestamp,
 } from "./lib/format"
 import {
+  FOCUS_THRESHOLD_OPTIONS,
   FONT_SIZE_PIXELS,
   getPreferencesSnapshot,
   getServerPreferencesSnapshot,
@@ -60,7 +54,6 @@ import type {
   ActivityData,
   ApplicationsData,
   DesktopPage,
-  OverviewData,
   RangeKey,
 } from "./lib/types"
 
@@ -72,6 +65,7 @@ const PAGES: Array<{
   icon: typeof Home01Icon
 }> = [
   { id: "overview", label: "Overview", icon: Home01Icon },
+  { id: "insights", label: "Insights", icon: Analytics01Icon },
   { id: "applications", label: "Applications", icon: Analytics01Icon },
   { id: "activity", label: "Activity", icon: Activity01Icon },
   { id: "mappings", label: "Mappings", icon: MapsEditingIcon },
@@ -101,7 +95,7 @@ function useDesktopPreferences() {
       const next =
         typeof update === "function"
           ? update(current)
-          : { ...current, ...update, version: 2 as const }
+          : { ...current, ...update, version: 3 as const }
       writePreferences(next)
     },
     []
@@ -277,200 +271,6 @@ function ThemeIconToggle({
         />
       </span>
     </button>
-  )
-}
-
-function OverviewPage({
-  range,
-  refreshVersion,
-  productiveTitles,
-  mappingRules,
-}: {
-  range: RangeKey
-  refreshVersion: number
-  productiveTitles: string[]
-  mappingRules: MappingRule[]
-}) {
-  const query = useDesktopQuery<OverviewData>(
-    () => getOverview(range, mappingRules),
-    [range, refreshVersion, mappingRules]
-  )
-
-  if (query.loading && !query.data) {
-    return (
-      <EmptyState
-        title="Loading overview"
-        description="Reading local activity analytics."
-      />
-    )
-  }
-  if (query.error && !query.data) {
-    return <ErrorState message={query.error} />
-  }
-  if (!query.data || query.data.trackedMinutes === 0) {
-    return (
-      <EmptyState
-        title="No activity yet"
-        description="Keep the collector running and this overview will fill in automatically."
-      />
-    )
-  }
-
-  const productiveMinutes = calculateProductiveMinutes(
-    query.data.applications,
-    productiveTitles
-  )
-
-  return (
-    <div className="page-stack">
-      <section className="hero-panel">
-        <div>
-          <p className="eyebrow">{query.data.range.label}</p>
-          <h1>Local activity intelligence</h1>
-          <p className="hero-copy">
-            Read-only analytics from your HyprTrack collector with the same
-            dashboard language as the web app.
-          </p>
-        </div>
-        <div className="hero-meta">
-          <span>Latest sample</span>
-          <strong>
-            {query.data.latestSampleAt
-              ? formatTimestamp(query.data.latestSampleAt, true)
-              : "Unavailable"}
-          </strong>
-        </div>
-      </section>
-
-      <section className="metrics-grid">
-        <Metric
-          label="Tracked time"
-          value={formatDuration(query.data.trackedMinutes)}
-          detail="Measured from completed activity intervals"
-        />
-        <Metric
-          label="Productive time"
-          value={formatDuration(productiveMinutes)}
-          detail={`${Math.round(
-            (productiveMinutes / query.data.trackedMinutes) * 100
-          )}% of tracked time`}
-        />
-        <Metric
-          label="Top application"
-          value={query.data.topApplication?.windowTitle ?? "None"}
-          detail={
-            query.data.topApplication
-              ? `${formatDuration(query.data.topApplication.minutes)} tracked`
-              : "No activity"
-          }
-        />
-        <Metric
-          label="Active streak"
-          value={`${query.data.streakDays} ${
-            query.data.streakDays === 1 ? "day" : "days"
-          }`}
-          detail="Consecutive days with tracked activity"
-        />
-      </section>
-
-      <section className="chart-panel panel">
-        <div className="panel-header">
-          <div>
-            <h2>Activity rhythm</h2>
-            <p>Minutes captured across the selected range.</p>
-          </div>
-        </div>
-        <div className="chart-frame">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={query.data.timeline}
-              margin={{ top: 16, right: 8, left: -24, bottom: 0 }}
-            >
-              <defs>
-                <linearGradient
-                  id="hyprtrackArea"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop
-                    offset="5%"
-                    stopColor="var(--chart-3)"
-                    stopOpacity={0.34}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="var(--chart-3)"
-                    stopOpacity={0.03}
-                  />
-                </linearGradient>
-              </defs>
-              <CartesianGrid
-                vertical={false}
-                stroke="var(--border)"
-                strokeDasharray="3 3"
-              />
-              <XAxis
-                dataKey="label"
-                tickLine={false}
-                axisLine={false}
-                minTickGap={32}
-              />
-              <YAxis tickLine={false} axisLine={false} width={32} />
-              <Tooltip
-                contentStyle={{
-                  background: "var(--card)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "12px",
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="minutes"
-                stroke="var(--chart-3)"
-                fill="url(#hyprtrackArea)"
-                strokeWidth={2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
-
-      <section className="panel full-width-panel">
-          <div className="panel-header">
-            <div>
-              <h2>Application usage</h2>
-              <p>Ranked by tracked duration.</p>
-            </div>
-          </div>
-          <div className="stack-list">
-            {query.data.applications.slice(0, 6).map((application, index) => (
-              <div
-                key={`${application.appClass}-${application.windowTitle}`}
-                className="usage-row"
-              >
-                <span className="usage-rank">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-                <div className="usage-main">
-                  <div className="usage-row-header">
-                    <strong>{application.windowTitle}</strong>
-                    <span>{formatDuration(application.minutes)}</span>
-                  </div>
-                  <p>
-                    {application.appClass} · {application.sessionCount}{" "}
-                    {application.sessionCount === 1 ? "session" : "sessions"}
-                  </p>
-                  <div className="usage-bar">
-                    <div style={{ width: `${application.share}%` }} />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-      </section>
-    </div>
   )
 }
 
@@ -840,6 +640,33 @@ function SettingsPage({
         <div className="panel">
           <div className="panel-header">
             <div>
+              <h2>Focus threshold</h2>
+              <p>Minimum uninterrupted session counted as focused time.</p>
+            </div>
+          </div>
+          <div className="toggle-grid focus-threshold-grid">
+            {FOCUS_THRESHOLD_OPTIONS.map((minutes) => (
+              <button
+                key={minutes}
+                className={`button ${
+                  preferences.focusThresholdMinutes === minutes
+                    ? "primary"
+                    : "secondary"
+                }`}
+                type="button"
+                onClick={() =>
+                  updatePreferences({ focusThresholdMinutes: minutes })
+                }
+              >
+                {minutes}m
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div>
               <h2>Sidebar width</h2>
               <p>Choose how much horizontal room the app shell uses.</p>
             </div>
@@ -1097,7 +924,7 @@ function App() {
   React.useEffect(() => {
     if (
       !autoRefreshEnabled ||
-      !["overview", "applications", "activity"].includes(page)
+      !["overview", "insights", "applications", "activity"].includes(page)
     ) {
       return
     }
@@ -1109,7 +936,12 @@ function App() {
   const pageTitle =
     PAGES.find((item) => item.id === page)?.label ??
     (page === "keybindings" ? KEYBINDINGS_PAGE.label : "HyprTrack")
-  const isDataPage = ["overview", "applications", "activity"].includes(page)
+  const isDataPage = [
+    "overview",
+    "insights",
+    "applications",
+    "activity",
+  ].includes(page)
 
   return (
     <div className="desktop-shell">
@@ -1196,6 +1028,15 @@ function App() {
               range={range}
               refreshVersion={refreshVersion}
               productiveTitles={preferences.productiveTitles}
+              focusThresholdMinutes={preferences.focusThresholdMinutes}
+              mappingRules={preferences.mappingRules}
+            />
+          ) : null}
+          {page === "insights" ? (
+            <InsightsPage
+              range={range}
+              refreshVersion={refreshVersion}
+              focusThresholdMinutes={preferences.focusThresholdMinutes}
               mappingRules={preferences.mappingRules}
             />
           ) : null}

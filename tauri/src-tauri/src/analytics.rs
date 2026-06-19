@@ -259,6 +259,72 @@ pub struct TimelinePoint {
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct FocusQuality {
+    pub focused_minutes: f64,
+    pub continuity_percent: f64,
+    pub longest_focused_block_minutes: f64,
+    pub average_session_minutes: f64,
+    pub context_switches: usize,
+    pub switches_per_tracked_hour: f64,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComparisonValue {
+    pub current: f64,
+    pub previous: f64,
+    pub percent_change: Option<f64>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightComparisons {
+    pub tracked_minutes: ComparisonValue,
+    pub focus_continuity: ComparisonValue,
+    pub average_session_minutes: ComparisonValue,
+    pub switches_per_tracked_hour: ComparisonValue,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RhythmCell {
+    pub day_index: usize,
+    pub day_label: String,
+    pub hour: u32,
+    pub tracked_minutes: f64,
+    pub focused_minutes: f64,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailyInsightPoint {
+    pub bucket: String,
+    pub label: String,
+    pub tracked_minutes: f64,
+    pub focused_minutes: f64,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightHighlights {
+    pub peak_working_window: Option<String>,
+    pub strongest_focus_day: Option<String>,
+    pub most_fragmented_day: Option<String>,
+    pub longest_focused_block_minutes: f64,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightsData {
+    pub range: RangePayload,
+    pub comparisons: InsightComparisons,
+    pub rhythm: Vec<RhythmCell>,
+    pub daily_trend: Vec<DailyInsightPoint>,
+    pub highlights: InsightHighlights,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LastHourCoverage {
     pub tracked_minutes: f64,
     pub untracked_minutes: f64,
@@ -277,6 +343,7 @@ pub struct OverviewData {
     pub timeline: Vec<TimelinePoint>,
     pub applications: Vec<ApplicationUsage>,
     pub recent_sessions: Vec<ActivitySession>,
+    pub focus_quality: FocusQuality,
     pub latest_sample_at: Option<String>,
 }
 
@@ -582,6 +649,352 @@ fn build_sessions(samples: &[ActivitySample]) -> Vec<ActivitySession> {
     sessions
 }
 
+fn count_context_switches(sessions: &[ActivitySession]) -> usize {
+    sessions
+        .windows(2)
+        .filter(|pair| {
+            let previous = &pair[0];
+            let current = &pair[1];
+            if previous.app_class == current.app_class
+                && previous.window_title == current.window_title
+            {
+                return false;
+            }
+            match (parse_time(&previous.end_at), parse_time(&current.start_at)) {
+                (Ok(previous_end), Ok(current_start)) => {
+                    let gap = current_start.timestamp_millis() - previous_end.timestamp_millis();
+                    (0..=300_000).contains(&gap)
+                }
+                _ => false,
+            }
+        })
+        .count()
+}
+
+fn calculate_focus_quality(
+    sessions: &[ActivitySession],
+    focus_threshold_minutes: f64,
+) -> FocusQuality {
+    let tracked_minutes: f64 = sessions
+        .iter()
+        .map(|session| session.duration_minutes)
+        .sum();
+    let focused_minutes: f64 = sessions
+        .iter()
+        .filter(|session| session.duration_minutes >= focus_threshold_minutes)
+        .map(|session| session.duration_minutes)
+        .sum();
+    let longest_focused_block_minutes = sessions
+        .iter()
+        .filter(|session| session.duration_minutes >= focus_threshold_minutes)
+        .map(|session| session.duration_minutes)
+        .fold(0.0, f64::max);
+    let context_switches = count_context_switches(sessions);
+
+    FocusQuality {
+        focused_minutes: round_minutes(focused_minutes),
+        continuity_percent: if tracked_minutes == 0.0 {
+            0.0
+        } else {
+            round_minutes((focused_minutes / tracked_minutes) * 100.0)
+        },
+        longest_focused_block_minutes: round_minutes(longest_focused_block_minutes),
+        average_session_minutes: if sessions.is_empty() {
+            0.0
+        } else {
+            round_minutes(tracked_minutes / sessions.len() as f64)
+        },
+        context_switches,
+        switches_per_tracked_hour: if tracked_minutes == 0.0 {
+            0.0
+        } else {
+            round_minutes(context_switches as f64 / (tracked_minutes / 60.0))
+        },
+    }
+}
+
+fn comparison_value(current: f64, previous: f64) -> ComparisonValue {
+    ComparisonValue {
+        current: round_minutes(current),
+        previous: round_minutes(previous),
+        percent_change: if previous == 0.0 {
+            None
+        } else {
+            Some(round_minutes(((current - previous) / previous) * 100.0))
+        },
+    }
+}
+
+fn previous_range(range: &EffectiveRange) -> EffectiveRange {
+    let duration = range.end - range.start;
+    let (start, end) = if range.key == RANGE_TODAY {
+        let start = range.start - Duration::days(1);
+        (start, start + duration)
+    } else {
+        (range.start - duration, range.start)
+    };
+
+    EffectiveRange {
+        key: range.key.clone(),
+        start,
+        end,
+        label: format!("Previous {}", range.label.to_lowercase()),
+    }
+}
+
+fn overlap_minutes(
+    start: DateTime<FixedOffset>,
+    end: DateTime<FixedOffset>,
+    bucket_start: DateTime<FixedOffset>,
+    bucket_end: DateTime<FixedOffset>,
+) -> f64 {
+    let overlap_start = if start > bucket_start {
+        start
+    } else {
+        bucket_start
+    };
+    let overlap_end = if end < bucket_end { end } else { bucket_end };
+    if overlap_end <= overlap_start {
+        0.0
+    } else {
+        (overlap_end.timestamp_millis() - overlap_start.timestamp_millis()) as f64 / 60_000.0
+    }
+}
+
+fn session_interval(
+    session: &ActivitySession,
+) -> Option<(DateTime<FixedOffset>, DateTime<FixedOffset>)> {
+    Some((
+        parse_time(&session.start_at).ok()?,
+        parse_time(&session.end_at).ok()?,
+    ))
+}
+
+fn build_rhythm(
+    samples: &[ActivitySample],
+    sessions: &[ActivitySession],
+    range: &EffectiveRange,
+    focus_threshold_minutes: f64,
+) -> Vec<RhythmCell> {
+    let day_labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    let day_count = if range.key == RANGE_TODAY { 1 } else { 7 };
+    let mut tracked = vec![0.0; day_count * 24];
+    let mut focused = vec![0.0; day_count * 24];
+
+    let cell_index = |value: DateTime<FixedOffset>| -> usize {
+        let day = if range.key == RANGE_TODAY {
+            0
+        } else {
+            value.weekday().num_days_from_monday() as usize
+        };
+        day * 24 + value.hour() as usize
+    };
+
+    for sample in samples {
+        let sample_end = sample
+            .ended_at
+            .unwrap_or_else(|| add_minute(&sample.sampled_at));
+        let mut cursor = sample.sampled_at;
+        while cursor < sample_end {
+            let bucket_start = ist()
+                .with_ymd_and_hms(
+                    cursor.year(),
+                    cursor.month(),
+                    cursor.day(),
+                    cursor.hour(),
+                    0,
+                    0,
+                )
+                .single()
+                .expect("valid hour bucket");
+            let bucket_end = bucket_start + Duration::hours(1);
+            tracked[cell_index(cursor)] +=
+                overlap_minutes(sample.sampled_at, sample_end, bucket_start, bucket_end);
+            cursor = if bucket_end > cursor {
+                bucket_end
+            } else {
+                cursor + Duration::hours(1)
+            };
+        }
+    }
+
+    for session in sessions
+        .iter()
+        .filter(|session| session.duration_minutes >= focus_threshold_minutes)
+    {
+        let Some((session_start, session_end)) = session_interval(session) else {
+            continue;
+        };
+        let mut cursor = session_start;
+        while cursor < session_end {
+            let bucket_start = ist()
+                .with_ymd_and_hms(
+                    cursor.year(),
+                    cursor.month(),
+                    cursor.day(),
+                    cursor.hour(),
+                    0,
+                    0,
+                )
+                .single()
+                .expect("valid hour bucket");
+            let bucket_end = bucket_start + Duration::hours(1);
+            focused[cell_index(cursor)] +=
+                overlap_minutes(session_start, session_end, bucket_start, bucket_end);
+            cursor = if bucket_end > cursor {
+                bucket_end
+            } else {
+                cursor + Duration::hours(1)
+            };
+        }
+    }
+
+    (0..day_count)
+        .flat_map(|day_index| {
+            let tracked = tracked.clone();
+            let focused = focused.clone();
+            (0..24).map(move |hour| {
+                let index = day_index * 24 + hour;
+                RhythmCell {
+                    day_index,
+                    day_label: if day_count == 1 {
+                        "Today".to_string()
+                    } else {
+                        day_labels[day_index].to_string()
+                    },
+                    hour: hour as u32,
+                    tracked_minutes: round_minutes(tracked[index]),
+                    focused_minutes: round_minutes(focused[index]),
+                }
+            })
+        })
+        .collect()
+}
+
+fn build_focus_trend(
+    samples: &[ActivitySample],
+    sessions: &[ActivitySession],
+    range: &EffectiveRange,
+    focus_threshold_minutes: f64,
+) -> Vec<DailyInsightPoint> {
+    let bucket_count = if range.key == RANGE_TODAY {
+        range.end.hour() as usize + 1
+    } else if range.key == RANGE_7D {
+        7
+    } else {
+        30
+    };
+    let bucket_duration = if range.key == RANGE_TODAY {
+        Duration::hours(1)
+    } else {
+        Duration::days(1)
+    };
+
+    (0..bucket_count)
+        .map(|index| {
+            let bucket_start = range.start + bucket_duration * index as i32;
+            let bucket_end = if bucket_start + bucket_duration > range.end {
+                range.end
+            } else {
+                bucket_start + bucket_duration
+            };
+            let tracked_minutes: f64 = samples
+                .iter()
+                .map(|sample| {
+                    overlap_minutes(
+                        sample.sampled_at,
+                        sample
+                            .ended_at
+                            .unwrap_or_else(|| add_minute(&sample.sampled_at)),
+                        bucket_start,
+                        bucket_end,
+                    )
+                })
+                .sum();
+            let focused_minutes: f64 = sessions
+                .iter()
+                .filter(|session| session.duration_minutes >= focus_threshold_minutes)
+                .filter_map(session_interval)
+                .map(|(start, end)| overlap_minutes(start, end, bucket_start, bucket_end))
+                .sum();
+
+            DailyInsightPoint {
+                bucket: if range.key == RANGE_TODAY {
+                    bucket_start.format("%Y-%m-%dT%H").to_string()
+                } else {
+                    bucket_start.format("%Y-%m-%d").to_string()
+                },
+                label: if range.key == RANGE_TODAY {
+                    bucket_start.format("%-I %P").to_string()
+                } else {
+                    bucket_start.format("%b %-d").to_string()
+                },
+                tracked_minutes: round_minutes(tracked_minutes),
+                focused_minutes: round_minutes(focused_minutes),
+            }
+        })
+        .collect()
+}
+
+fn build_highlights(
+    rhythm: &[RhythmCell],
+    daily_trend: &[DailyInsightPoint],
+    sessions: &[ActivitySession],
+    focus_quality: &FocusQuality,
+) -> InsightHighlights {
+    let peak = rhythm
+        .iter()
+        .max_by(|left, right| {
+            left.tracked_minutes
+                .partial_cmp(&right.tracked_minutes)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .filter(|cell| cell.tracked_minutes > 0.0);
+    let strongest = daily_trend
+        .iter()
+        .max_by(|left, right| {
+            left.focused_minutes
+                .partial_cmp(&right.focused_minutes)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .filter(|point| point.focused_minutes > 0.0);
+
+    let mut fragmented: Vec<(String, usize)> = Vec::new();
+    for session in sessions {
+        let Ok(start) = parse_time(&session.start_at) else {
+            continue;
+        };
+        let key = start.format("%Y-%m-%d").to_string();
+        if fragmented.iter().all(|entry| entry.0 != key) {
+            let same_day = sessions
+                .iter()
+                .filter(|candidate| candidate.start_at.starts_with(&key))
+                .cloned()
+                .collect::<Vec<_>>();
+            fragmented.push((key, count_context_switches(&same_day)));
+        }
+    }
+    let most_fragmented = fragmented
+        .iter()
+        .max_by_key(|entry| entry.1)
+        .filter(|entry| entry.1 > 0)
+        .and_then(|entry| parse_time(&format!("{}T00:00:00+05:30", entry.0)).ok());
+
+    InsightHighlights {
+        peak_working_window: peak.map(|cell| {
+            format!(
+                "{} · {:02}:00–{:02}:00",
+                cell.day_label,
+                cell.hour,
+                (cell.hour + 1) % 24
+            )
+        }),
+        strongest_focus_day: strongest.map(|point| point.label.clone()),
+        most_fragmented_day: most_fragmented.map(|day| day.format("%b %-d").to_string()),
+        longest_focused_block_minutes: focus_quality.longest_focused_block_minutes,
+    }
+}
+
 fn build_applications(samples: &[ActivitySample]) -> Vec<ApplicationUsage> {
     let total_minutes: f64 = samples.iter().map(sample_minutes).sum();
     let sessions = build_sessions(samples);
@@ -810,13 +1223,17 @@ fn calculate_streak(connection: &Connection, end: &DateTime<FixedOffset>) -> Res
 pub fn read_overview(
     database_path: &str,
     range_key: &str,
+    focus_threshold_minutes: f64,
     mapping_rules: &[MappingRule],
 ) -> Result<OverviewData, String> {
     let connection = open_database(database_path)?;
     let range = resolve_range(range_key)?;
     let samples = read_samples(&connection, &range, mapping_rules)?;
     let applications = build_applications(&samples);
-    let recent_sessions = build_sessions(&samples)
+    let sessions = build_sessions(&samples);
+    let recent_sessions = sessions
+        .iter()
+        .cloned()
         .into_iter()
         .rev()
         .take(6)
@@ -837,7 +1254,52 @@ pub fn read_overview(
         timeline: build_timeline(&samples, &range),
         applications,
         recent_sessions,
+        focus_quality: calculate_focus_quality(&sessions, focus_threshold_minutes),
         latest_sample_at,
+    })
+}
+
+pub fn read_insights(
+    database_path: &str,
+    range_key: &str,
+    focus_threshold_minutes: f64,
+    mapping_rules: &[MappingRule],
+) -> Result<InsightsData, String> {
+    let connection = open_database(database_path)?;
+    let range = resolve_range(range_key)?;
+    let previous = previous_range(&range);
+    let samples = read_samples(&connection, &range, mapping_rules)?;
+    let previous_samples = read_samples(&connection, &previous, mapping_rules)?;
+    let sessions = build_sessions(&samples);
+    let previous_sessions = build_sessions(&previous_samples);
+    let quality = calculate_focus_quality(&sessions, focus_threshold_minutes);
+    let previous_quality = calculate_focus_quality(&previous_sessions, focus_threshold_minutes);
+    let tracked_minutes = samples.iter().map(sample_minutes).sum::<f64>();
+    let previous_tracked_minutes = previous_samples.iter().map(sample_minutes).sum::<f64>();
+    let rhythm = build_rhythm(&samples, &sessions, &range, focus_threshold_minutes);
+    let daily_trend = build_focus_trend(&samples, &sessions, &range, focus_threshold_minutes);
+    let highlights = build_highlights(&rhythm, &daily_trend, &sessions, &quality);
+
+    Ok(InsightsData {
+        range: range_payload(&range),
+        comparisons: InsightComparisons {
+            tracked_minutes: comparison_value(tracked_minutes, previous_tracked_minutes),
+            focus_continuity: comparison_value(
+                quality.continuity_percent,
+                previous_quality.continuity_percent,
+            ),
+            average_session_minutes: comparison_value(
+                quality.average_session_minutes,
+                previous_quality.average_session_minutes,
+            ),
+            switches_per_tracked_hour: comparison_value(
+                quality.switches_per_tracked_hour,
+                previous_quality.switches_per_tracked_hour,
+            ),
+        },
+        rhythm,
+        daily_trend,
+        highlights,
     })
 }
 
@@ -957,6 +1419,103 @@ mod tests {
     use rusqlite::Connection;
     use tempfile::tempdir;
 
+    fn session(
+        start_at: &str,
+        end_at: &str,
+        app_class: &str,
+        window_title: &str,
+        duration_minutes: f64,
+    ) -> ActivitySession {
+        ActivitySession {
+            start_at: start_at.to_string(),
+            end_at: end_at.to_string(),
+            app_class: app_class.to_string(),
+            window_title: window_title.to_string(),
+            duration_minutes,
+            sample_count: 1,
+        }
+    }
+
+    #[test]
+    fn focus_quality_uses_threshold_and_ignores_switches_after_long_breaks() {
+        let sessions = vec![
+            session(
+                "2026-06-14T09:00:00+05:30",
+                "2026-06-14T09:30:00+05:30",
+                "code",
+                "VS Code",
+                30.0,
+            ),
+            session(
+                "2026-06-14T09:32:00+05:30",
+                "2026-06-14T09:42:00+05:30",
+                "zen",
+                "GitHub",
+                10.0,
+            ),
+            session(
+                "2026-06-14T09:50:00+05:30",
+                "2026-06-14T10:15:00+05:30",
+                "code",
+                "VS Code",
+                25.0,
+            ),
+        ];
+
+        let quality = calculate_focus_quality(&sessions, 25.0);
+
+        assert_eq!(quality.focused_minutes, 55.0);
+        assert_eq!(quality.continuity_percent, 84.62);
+        assert_eq!(quality.longest_focused_block_minutes, 30.0);
+        assert_eq!(quality.average_session_minutes, 21.67);
+        assert_eq!(quality.context_switches, 1);
+        assert_eq!(quality.switches_per_tracked_hour, 0.92);
+    }
+
+    #[test]
+    fn comparison_has_no_percent_change_without_previous_baseline() {
+        assert_eq!(comparison_value(20.0, 0.0).percent_change, None);
+        assert_eq!(comparison_value(30.0, 20.0).percent_change, Some(50.0));
+    }
+
+    #[test]
+    fn today_comparison_uses_yesterdays_equivalent_elapsed_window() {
+        let range = EffectiveRange {
+            key: RANGE_TODAY.to_string(),
+            start: parse_time("2026-06-14T00:00:00+05:30").unwrap(),
+            end: parse_time("2026-06-14T13:30:00+05:30").unwrap(),
+            label: "Today".to_string(),
+        };
+
+        let previous = previous_range(&range);
+
+        assert_eq!(format_seconds(previous.start), "2026-06-13T00:00:00+05:30");
+        assert_eq!(format_seconds(previous.end), "2026-06-13T13:30:00+05:30");
+    }
+
+    #[test]
+    fn today_rhythm_has_24_hour_cells_and_tracks_focused_overlap() {
+        let range = EffectiveRange {
+            key: RANGE_TODAY.to_string(),
+            start: parse_time("2026-06-14T00:00:00+05:30").unwrap(),
+            end: parse_time("2026-06-14T12:00:00+05:30").unwrap(),
+            label: "Today".to_string(),
+        };
+        let samples = vec![ActivitySample {
+            sampled_at: parse_time("2026-06-14T09:00:00+05:30").unwrap(),
+            ended_at: Some(parse_time("2026-06-14T09:30:00+05:30").unwrap()),
+            app_class: "code".to_string(),
+            window_title: "VS Code".to_string(),
+        }];
+        let sessions = build_sessions(&samples);
+
+        let rhythm = build_rhythm(&samples, &sessions, &range, 25.0);
+
+        assert_eq!(rhythm.len(), 24);
+        assert_eq!(rhythm[9].tracked_minutes, 30.0);
+        assert_eq!(rhythm[9].focused_minutes, 30.0);
+    }
+
     #[test]
     fn github_history_is_normalized_before_the_chatgpt_fallback() {
         assert_eq!(
@@ -972,9 +1531,7 @@ mod tests {
             normalize_display_labels_with_mappings(
                 "zen",
                 "ChatGPT",
-                Some(
-                    "wrestle-R/dots-hyprland: Usability-first dotfiles — Zen Browser"
-                ),
+                Some("wrestle-R/dots-hyprland: Usability-first dotfiles — Zen Browser"),
                 &[],
             ),
             ("zen".to_string(), "GitHub".to_string()),
@@ -995,9 +1552,7 @@ mod tests {
             normalize_display_labels_with_mappings(
                 "zen",
                 "GitHub",
-                Some(
-                    "wrestle-R/dots-hyprland: Usability-first dotfiles — Zen Browser"
-                ),
+                Some("wrestle-R/dots-hyprland: Usability-first dotfiles — Zen Browser"),
                 &rules,
             ),
             ("zen".to_string(), "Dotfiles".to_string()),

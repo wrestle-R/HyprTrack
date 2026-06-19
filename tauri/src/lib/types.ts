@@ -33,6 +33,54 @@ export type TimelinePoint = {
   minutes: number
 }
 
+export type FocusQuality = {
+  focusedMinutes: number
+  continuityPercent: number
+  longestFocusedBlockMinutes: number
+  averageSessionMinutes: number
+  contextSwitches: number
+  switchesPerTrackedHour: number
+}
+
+export type ComparisonValue = {
+  current: number
+  previous: number
+  percentChange: number | null
+}
+
+export type RhythmCell = {
+  dayIndex: number
+  dayLabel: string
+  hour: number
+  trackedMinutes: number
+  focusedMinutes: number
+}
+
+export type DailyInsightPoint = {
+  bucket: string
+  label: string
+  trackedMinutes: number
+  focusedMinutes: number
+}
+
+export type InsightsData = {
+  range: EffectiveRange
+  comparisons: {
+    trackedMinutes: ComparisonValue
+    focusContinuity: ComparisonValue
+    averageSessionMinutes: ComparisonValue
+    switchesPerTrackedHour: ComparisonValue
+  }
+  rhythm: RhythmCell[]
+  dailyTrend: DailyInsightPoint[]
+  highlights: {
+    peakWorkingWindow: string | null
+    strongestFocusDay: string | null
+    mostFragmentedDay: string | null
+    longestFocusedBlockMinutes: number
+  }
+}
+
 export type OverviewData = {
   range: EffectiveRange
   trackedMinutes: number
@@ -41,6 +89,7 @@ export type OverviewData = {
   timeline: TimelinePoint[]
   applications: ApplicationUsage[]
   recentSessions: ActivitySession[]
+  focusQuality: FocusQuality
   latestSampleAt: string | null
 }
 
@@ -76,6 +125,7 @@ export type HealthData = {
 
 export type DesktopPage =
   | "overview"
+  | "insights"
   | "applications"
   | "activity"
   | "mappings"

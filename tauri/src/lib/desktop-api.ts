@@ -4,13 +4,34 @@ import type {
   ActivityData,
   ApplicationsData,
   HealthData,
+  InsightsData,
   OverviewData,
   RangeKey,
 } from "./types"
 import type { MappingRule } from "./mappings"
 
-export function getOverview(range: RangeKey, mappingRules: MappingRule[]) {
-  return invoke<OverviewData>("get_overview", { range, mappingRules })
+export function getOverview(
+  range: RangeKey,
+  focusThresholdMinutes: number,
+  mappingRules: MappingRule[]
+) {
+  return invoke<OverviewData>("get_overview", {
+    range,
+    focusThresholdMinutes,
+    mappingRules,
+  })
+}
+
+export function getInsights(
+  range: RangeKey,
+  focusThresholdMinutes: number,
+  mappingRules: MappingRule[]
+) {
+  return invoke<InsightsData>("get_insights", {
+    range,
+    focusThresholdMinutes,
+    mappingRules,
+  })
 }
 
 export function getActivity(args: {

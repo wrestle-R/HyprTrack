@@ -31,13 +31,13 @@ is not uploaded anywhere.
 
 ## Install On Arch Linux
 
-The current release is `v0.1.7`. Download the AppImage into a permanent
+The current release is `v0.1.8`. Download the AppImage into a permanent
 location:
 
 ```bash
 mkdir -p ~/.local/bin
 wget -O ~/.local/bin/hyprtrack-desktop.AppImage \
-  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.7/HyprTrack.Desktop_0.1.7_amd64.AppImage
+  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.8/HyprTrack.Desktop_0.1.8_amd64.AppImage
 chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
 ```
@@ -84,7 +84,7 @@ and uses a lock file beside the database to avoid duplicate writers.
 
 ## Desktop Features
 
-- Overview, application rankings, and grouped activity sessions
+- Overview, focus quality, personal insights, application rankings, and grouped activity sessions
 - Editable title mappings that clean up current and historical dashboard labels
   without rewriting the SQLite database
 - App-local keybindings with duplicate and unsafe-shortcut validation
