@@ -59,6 +59,38 @@ Keep the AppImage at this path if you want the launcher entry to keep working.
 If you move the AppImage later, launch it manually from the new path once so
 HyprTrack can refresh the desktop entry.
 
+## Update Without Losing Activity Data
+
+Replacing the AppImage updates the desktop application and exported collector
+script. It does not replace or delete:
+
+```text
+~/.local/bin/hyprtrack/collector/hyprtrack.db
+```
+
+Create a SQLite-safe backup first, then replace the AppImage. Change
+`VERSION` to the release you want to install:
+
+### Update From A Published Release
+
+```bash
+VERSION=0.1.9
+mkdir -p ~/.local/share/hyprtrack-backups
+database="$HOME/.local/bin/hyprtrack/collector/hyprtrack.db"
+backup="$HOME/.local/share/hyprtrack-backups/hyprtrack-$(date +%Y%m%d-%H%M%S).db"
+sqlite3 "$database" ".backup '$backup'"
+
+wget -O ~/.local/bin/hyprtrack-desktop.AppImage.new \
+  "https://github.com/wrestle-R/HyprTrack/releases/download/v${VERSION}/HyprTrack.Desktop_${VERSION}_amd64.AppImage"
+chmod +x ~/.local/bin/hyprtrack-desktop.AppImage.new
+mv ~/.local/bin/hyprtrack-desktop.AppImage.new \
+  ~/.local/bin/hyprtrack-desktop.AppImage
+~/.local/bin/hyprtrack-desktop.AppImage
+```
+
+Use this option only after that version has been published on the GitHub
+Releases page.
+
 ## Start Tracking From Hyprland
 
 Add the collector to your Hyprland autostart config after launching the
