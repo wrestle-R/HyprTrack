@@ -50,6 +50,20 @@ export const DEFAULT_MAPPING_RULES: MappingRule[] = [
     isDefault: true,
   },
   {
+    id: "default-notion",
+    matchText: "notion",
+    displayLabel: "Notion",
+    enabled: true,
+    isDefault: true,
+  },
+  {
+    id: "default-instagram",
+    matchText: "instagram",
+    displayLabel: "Instagram",
+    enabled: true,
+    isDefault: true,
+  },
+  {
     id: "default-leetcode",
     matchText: "leetcode",
     displayLabel: "LeetCode",

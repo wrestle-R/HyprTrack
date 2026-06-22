@@ -8,6 +8,27 @@ import {
 } from "./mappings"
 
 describe("mapping rules", () => {
+  it("includes Notion and Instagram in the default mappings", () => {
+    expect(DEFAULT_MAPPING_RULES).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "default-notion",
+          matchText: "notion",
+          displayLabel: "Notion",
+          enabled: true,
+          isDefault: true,
+        }),
+        expect.objectContaining({
+          id: "default-instagram",
+          matchText: "instagram",
+          displayLabel: "Instagram",
+          enabled: true,
+          isDefault: true,
+        }),
+      ])
+    )
+  })
+
   it("places custom rules before default rules while preserving each group order", () => {
     const rules: MappingRule[] = [
       DEFAULT_MAPPING_RULES[0],
