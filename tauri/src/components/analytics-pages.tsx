@@ -29,12 +29,17 @@ import type {
   RangeKey,
   TimelinePoint,
 } from "../lib/types"
+import { DataPageSkeleton, RefreshStatus } from "./data-loading"
 
 type AnalyticsPageProps = {
   range: RangeKey
   refreshVersion: number
   focusThresholdMinutes: number
   mappingRules: MappingRule[]
+}
+
+export function trackedTimeComparisonLabel(range: RangeKey) {
+  return range === "today" ? "Tracked time" : "Average tracked/day"
 }
 
 function EmptyState({
@@ -276,18 +281,19 @@ export function OverviewPage({
   focusThresholdMinutes,
   mappingRules,
 }: AnalyticsPageProps & { productiveTitles: string[] }) {
+  const scopeKey = JSON.stringify([
+    range,
+    focusThresholdMinutes,
+    mappingRules,
+  ])
   const query = useDesktopQuery<OverviewData>(
     () => getOverview(range, focusThresholdMinutes, mappingRules),
-    [range, refreshVersion, focusThresholdMinutes, mappingRules]
+    [range, refreshVersion, focusThresholdMinutes, mappingRules],
+    scopeKey
   )
 
   if (query.loading && !query.data) {
-    return (
-      <EmptyState
-        title="Loading overview"
-        description="Reading local activity analytics."
-      />
-    )
+    return <DataPageSkeleton variant="overview" />
   }
   if (query.error && !query.data) {
     return <ErrorState message={query.error} />
@@ -306,11 +312,7 @@ export function OverviewPage({
     data.applications,
     productiveTitles
   )
-  const average =
-    data.timeline.length === 0
-      ? 0
-      : data.timeline.reduce((total, point) => total + point.minutes, 0) /
-        data.timeline.length
+  const average = data.averageTrackedMinutes
   const peak = data.timeline.reduce<TimelinePoint | null>(
     (current, point) =>
       current === null || point.minutes > current.minutes ? point : current,
@@ -318,7 +320,8 @@ export function OverviewPage({
   )
 
   return (
-    <div className="page-stack">
+    <div className="page-stack" aria-busy={query.refreshing}>
+      <RefreshStatus refreshing={query.refreshing} error={query.error} />
       <section className="hero-panel">
         <div>
           <p className="eyebrow">{data.range.label}</p>
@@ -375,7 +378,11 @@ export function OverviewPage({
             <p>Tracked minutes across the selected range.</p>
           </div>
           <div className="chart-summary">
-            <span>Average per interval</span>
+            <span>
+              {range === "today"
+                ? "Average per interval"
+                : "Average active day"}
+            </span>
             <strong>{formatDuration(average)}</strong>
           </div>
         </div>
@@ -539,18 +546,19 @@ export function InsightsPage({
   focusThresholdMinutes,
   mappingRules,
 }: AnalyticsPageProps) {
+  const scopeKey = JSON.stringify([
+    range,
+    focusThresholdMinutes,
+    mappingRules,
+  ])
   const query = useDesktopQuery<InsightsData>(
     () => getInsights(range, focusThresholdMinutes, mappingRules),
-    [range, refreshVersion, focusThresholdMinutes, mappingRules]
+    [range, refreshVersion, focusThresholdMinutes, mappingRules],
+    scopeKey
   )
 
   if (query.loading && !query.data) {
-    return (
-      <EmptyState
-        title="Loading insights"
-        description="Comparing your local activity periods."
-      />
-    )
+    return <DataPageSkeleton variant="insights" />
   }
   if (query.error && !query.data) {
     return <ErrorState message={query.error} />
@@ -565,9 +573,14 @@ export function InsightsPage({
   }
 
   const data = query.data
+  const trackedComparison =
+    range === "today"
+      ? data.comparisons.trackedMinutes
+      : data.comparisons.averageTrackedMinutesPerActiveDay
 
   return (
-    <div className="page-stack">
+    <div className="page-stack" aria-busy={query.refreshing}>
+      <RefreshStatus refreshing={query.refreshing} error={query.error} />
       <section className="hero-panel insights-hero">
         <div>
           <p className="eyebrow">{data.range.label}</p>
@@ -585,8 +598,8 @@ export function InsightsPage({
 
       <section className="comparison-grid">
         <ComparisonCard
-          label="Tracked time"
-          comparison={data.comparisons.trackedMinutes}
+          label={trackedTimeComparisonLabel(range)}
+          comparison={trackedComparison}
           formatValue={formatDuration}
         />
         <ComparisonCard

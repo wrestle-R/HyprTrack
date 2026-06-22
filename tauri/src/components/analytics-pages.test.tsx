@@ -2,7 +2,11 @@ import { render, screen } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 
 import type { RhythmCell } from "../lib/types"
-import { ActivityTooltip, RhythmRail } from "./analytics-pages"
+import {
+  ActivityTooltip,
+  RhythmRail,
+  trackedTimeComparisonLabel,
+} from "./analytics-pages"
 
 describe("activity rhythm tooltip", () => {
   it("shows duration and difference from the selected-range average", () => {
@@ -26,6 +30,14 @@ describe("activity rhythm tooltip", () => {
     expect(screen.getByText("10:00")).toBeInTheDocument()
     expect(screen.getByText("45m")).toBeInTheDocument()
     expect(screen.getByText("15m above average")).toBeInTheDocument()
+  })
+})
+
+describe("tracked time comparison label", () => {
+  it("uses totals for today and active-day averages for multi-day ranges", () => {
+    expect(trackedTimeComparisonLabel("today")).toBe("Tracked time")
+    expect(trackedTimeComparisonLabel("7d")).toBe("Average tracked/day")
+    expect(trackedTimeComparisonLabel("30d")).toBe("Average tracked/day")
   })
 })
 

@@ -67,6 +67,7 @@ export type InsightsData = {
   range: EffectiveRange
   comparisons: {
     trackedMinutes: ComparisonValue
+    averageTrackedMinutesPerActiveDay: ComparisonValue
     focusContinuity: ComparisonValue
     averageSessionMinutes: ComparisonValue
     switchesPerTrackedHour: ComparisonValue
@@ -84,6 +85,7 @@ export type InsightsData = {
 export type OverviewData = {
   range: EffectiveRange
   trackedMinutes: number
+  averageTrackedMinutes: number
   topApplication: ApplicationUsage | null
   streakDays: number
   timeline: TimelinePoint[]

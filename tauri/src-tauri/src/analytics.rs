@@ -280,6 +280,7 @@ pub struct ComparisonValue {
 #[serde(rename_all = "camelCase")]
 pub struct InsightComparisons {
     pub tracked_minutes: ComparisonValue,
+    pub average_tracked_minutes_per_active_day: ComparisonValue,
     pub focus_continuity: ComparisonValue,
     pub average_session_minutes: ComparisonValue,
     pub switches_per_tracked_hour: ComparisonValue,
@@ -338,6 +339,7 @@ pub struct LastHourCoverage {
 pub struct OverviewData {
     pub range: RangePayload,
     pub tracked_minutes: f64,
+    pub average_tracked_minutes: f64,
     pub top_application: Option<ApplicationUsage>,
     pub streak_days: usize,
     pub timeline: Vec<TimelinePoint>,
@@ -722,6 +724,30 @@ fn comparison_value(current: f64, previous: f64) -> ComparisonValue {
         } else {
             Some(round_minutes(((current - previous) / previous) * 100.0))
         },
+    }
+}
+
+fn average_active_buckets(minutes: &[f64]) -> f64 {
+    let active = minutes
+        .iter()
+        .copied()
+        .filter(|minutes| *minutes > 0.0)
+        .collect::<Vec<_>>();
+    if active.is_empty() {
+        0.0
+    } else {
+        round_minutes(active.iter().sum::<f64>() / active.len() as f64)
+    }
+}
+
+fn average_timeline_minutes(points: &[TimelinePoint], range: &EffectiveRange) -> f64 {
+    if points.is_empty() {
+        return 0.0;
+    }
+    if range.key == RANGE_TODAY {
+        round_minutes(points.iter().map(|point| point.minutes).sum::<f64>() / points.len() as f64)
+    } else {
+        average_active_buckets(&points.iter().map(|point| point.minutes).collect::<Vec<_>>())
     }
 }
 
@@ -1240,6 +1266,7 @@ pub fn read_overview(
         .collect::<Vec<_>>();
     let tracked_minutes = round_minutes(samples.iter().map(sample_minutes).sum());
     let streak_days = calculate_streak(&connection, &range.end)?;
+    let timeline = build_timeline(&samples, &range);
     let latest_sample_at = connection
         .query_row("SELECT MAX(sampled_at) FROM activity_samples", [], |row| {
             row.get::<_, Option<String>>(0)
@@ -1249,9 +1276,10 @@ pub fn read_overview(
     Ok(OverviewData {
         range: range_payload(&range),
         tracked_minutes,
+        average_tracked_minutes: average_timeline_minutes(&timeline, &range),
         top_application: applications.first().cloned(),
         streak_days,
-        timeline: build_timeline(&samples, &range),
+        timeline,
         applications,
         recent_sessions,
         focus_quality: calculate_focus_quality(&sessions, focus_threshold_minutes),
@@ -1276,6 +1304,8 @@ pub fn read_insights(
     let previous_quality = calculate_focus_quality(&previous_sessions, focus_threshold_minutes);
     let tracked_minutes = samples.iter().map(sample_minutes).sum::<f64>();
     let previous_tracked_minutes = previous_samples.iter().map(sample_minutes).sum::<f64>();
+    let current_timeline = build_timeline(&samples, &range);
+    let previous_timeline = build_timeline(&previous_samples, &previous);
     let rhythm = build_rhythm(&samples, &sessions, &range, focus_threshold_minutes);
     let daily_trend = build_focus_trend(&samples, &sessions, &range, focus_threshold_minutes);
     let highlights = build_highlights(&rhythm, &daily_trend, &sessions, &quality);
@@ -1284,6 +1314,18 @@ pub fn read_insights(
         range: range_payload(&range),
         comparisons: InsightComparisons {
             tracked_minutes: comparison_value(tracked_minutes, previous_tracked_minutes),
+            average_tracked_minutes_per_active_day: comparison_value(
+                if range.key == RANGE_TODAY {
+                    tracked_minutes
+                } else {
+                    average_timeline_minutes(&current_timeline, &range)
+                },
+                if previous.key == RANGE_TODAY {
+                    previous_tracked_minutes
+                } else {
+                    average_timeline_minutes(&previous_timeline, &previous)
+                },
+            ),
             focus_continuity: comparison_value(
                 quality.continuity_percent,
                 previous_quality.continuity_percent,
@@ -1476,6 +1518,89 @@ mod tests {
     fn comparison_has_no_percent_change_without_previous_baseline() {
         assert_eq!(comparison_value(20.0, 0.0).percent_change, None);
         assert_eq!(comparison_value(30.0, 20.0).percent_change, Some(50.0));
+    }
+
+    #[test]
+    fn active_day_average_ignores_empty_days() {
+        assert_eq!(average_active_buckets(&[120.0, 0.0, 60.0]), 90.0);
+    }
+
+    #[test]
+    fn active_day_average_is_zero_when_every_day_is_empty() {
+        assert_eq!(average_active_buckets(&[0.0, 0.0, 0.0]), 0.0);
+    }
+
+    #[test]
+    fn active_day_comparison_excludes_empty_days_in_each_range() {
+        let comparison = comparison_value(
+            average_active_buckets(&[120.0, 0.0, 60.0]),
+            average_active_buckets(&[0.0, 30.0, 0.0]),
+        );
+
+        assert_eq!(comparison.current, 90.0);
+        assert_eq!(comparison.previous, 30.0);
+        assert_eq!(comparison.percent_change, Some(200.0));
+    }
+
+    #[test]
+    fn overview_average_keeps_today_hourly_buckets_but_excludes_empty_days() {
+        let today = EffectiveRange {
+            key: RANGE_TODAY.to_string(),
+            start: parse_time("2026-06-14T00:00:00+05:30").unwrap(),
+            end: parse_time("2026-06-14T02:30:00+05:30").unwrap(),
+            label: "Today".to_string(),
+        };
+        let week = EffectiveRange {
+            key: RANGE_7D.to_string(),
+            start: parse_time("2026-06-08T00:00:00+05:30").unwrap(),
+            end: parse_time("2026-06-14T02:30:00+05:30").unwrap(),
+            label: "7 days".to_string(),
+        };
+        let points = vec![
+            TimelinePoint {
+                bucket: "one".to_string(),
+                label: "One".to_string(),
+                minutes: 120.0,
+            },
+            TimelinePoint {
+                bucket: "two".to_string(),
+                label: "Two".to_string(),
+                minutes: 0.0,
+            },
+            TimelinePoint {
+                bucket: "three".to_string(),
+                label: "Three".to_string(),
+                minutes: 60.0,
+            },
+        ];
+
+        assert_eq!(average_timeline_minutes(&points, &today), 60.0);
+        assert_eq!(average_timeline_minutes(&points, &week), 90.0);
+    }
+
+    #[test]
+    fn seven_day_timeline_keeps_empty_days_visible() {
+        let range = EffectiveRange {
+            key: RANGE_7D.to_string(),
+            start: parse_time("2026-06-08T00:00:00+05:30").unwrap(),
+            end: parse_time("2026-06-14T12:00:00+05:30").unwrap(),
+            label: "7 days".to_string(),
+        };
+        let samples = vec![ActivitySample {
+            sampled_at: parse_time("2026-06-10T09:00:00+05:30").unwrap(),
+            ended_at: Some(parse_time("2026-06-10T10:00:00+05:30").unwrap()),
+            app_class: "code".to_string(),
+            window_title: "VS Code".to_string(),
+        }];
+
+        let timeline = build_timeline(&samples, &range);
+
+        assert_eq!(timeline.len(), 7);
+        assert_eq!(
+            timeline.iter().filter(|point| point.minutes == 0.0).count(),
+            6
+        );
+        assert_eq!(timeline[2].minutes, 60.0);
     }
 
     #[test]

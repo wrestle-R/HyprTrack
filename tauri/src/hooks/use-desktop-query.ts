@@ -2,28 +2,45 @@ import * as React from "react"
 
 export function useDesktopQuery<T>(
   loader: () => Promise<T>,
-  dependencies: React.DependencyList
+  dependencies: React.DependencyList,
+  scopeKey: string
 ) {
   const [state, setState] = React.useState<{
     data: T | null
     error: string | null
     updatedAt: Date | null
     loading: boolean
+    refreshing: boolean
+    scopeKey: string | null
   }>({
     data: null,
     error: null,
     updatedAt: null,
     loading: true,
+    refreshing: false,
+    scopeKey: null,
   })
 
   React.useEffect(() => {
     let cancelled = false
 
-    setState((current) => ({
-      ...current,
-      error: null,
-      loading: current.data === null,
-    }))
+    setState((current) =>
+      current.scopeKey === scopeKey && current.data !== null
+        ? {
+            ...current,
+            error: null,
+            loading: false,
+            refreshing: true,
+          }
+        : {
+            data: null,
+            error: null,
+            updatedAt: null,
+            loading: true,
+            refreshing: false,
+            scopeKey,
+          }
+    )
 
     void loader()
       .then((data) => {
@@ -35,6 +52,8 @@ export function useDesktopQuery<T>(
           error: null,
           updatedAt: new Date(),
           loading: false,
+          refreshing: false,
+          scopeKey,
         })
       })
       .catch((error: unknown) => {
@@ -48,6 +67,7 @@ export function useDesktopQuery<T>(
               ? error.message
               : "The desktop data could not be loaded.",
           loading: false,
+          refreshing: false,
         }))
       })
 
@@ -56,5 +76,21 @@ export function useDesktopQuery<T>(
     }
   }, dependencies)
 
-  return state
+  if (state.scopeKey !== scopeKey) {
+    return {
+      data: null,
+      error: null,
+      updatedAt: null,
+      loading: true,
+      refreshing: false,
+    }
+  }
+
+  return {
+    data: state.data,
+    error: state.error,
+    updatedAt: state.updatedAt,
+    loading: state.loading,
+    refreshing: state.refreshing,
+  }
 }

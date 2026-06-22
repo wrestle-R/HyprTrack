@@ -18,6 +18,11 @@ import {
   InsightsPage,
   OverviewPage,
 } from "./components/analytics-pages"
+import {
+  DataPageSkeleton,
+  InlineListSkeleton,
+  RefreshStatus,
+} from "./components/data-loading"
 import { HyprTrackMark } from "./components/hyprtrack-mark"
 import { KeybindingsPage } from "./components/keybindings-page"
 import { MappingsPage } from "./components/mappings-page"
@@ -295,6 +300,14 @@ function ActivityPage({
   })
   const page = pageState.filterKey === filterKey ? pageState.page : 1
   const pageSize = 15
+  const scopeKey = JSON.stringify([
+    range,
+    app,
+    deferredSearch,
+    page,
+    pageSize,
+    mappingRules,
+  ])
 
   const query = useDesktopQuery<ActivityData>(
     () =>
@@ -306,7 +319,8 @@ function ActivityPage({
         pageSize,
         mappingRules,
       }),
-    [range, app, deferredSearch, page, refreshVersion, mappingRules]
+    [range, app, deferredSearch, page, refreshVersion, mappingRules],
+    scopeKey
   )
 
   React.useEffect(() => {
@@ -316,12 +330,7 @@ function ActivityPage({
   }, [filterKey])
 
   if (query.loading && !query.data) {
-    return (
-      <EmptyState
-        title="Loading activity"
-        description="Grouping tracked sessions."
-      />
-    )
+    return <DataPageSkeleton variant="table" />
   }
   if (query.error && !query.data) {
     return <ErrorState message={query.error} />
@@ -333,7 +342,8 @@ function ActivityPage({
   const totalPages = query.data.pagination.totalPages
 
   return (
-    <div className="page-stack">
+    <div className="page-stack" aria-busy={query.refreshing}>
+      <RefreshStatus refreshing={query.refreshing} error={query.error} />
       <LastHourCoverageBox coverage={query.data.lastHourCoverage} />
       <section className="panel filters-panel">
         <div className="panel-header">
@@ -457,18 +467,15 @@ function ApplicationsPage({
 }) {
   const [search, setSearch] = React.useState("")
   const deferredSearch = React.useDeferredValue(search)
+  const scopeKey = JSON.stringify([range, deferredSearch, mappingRules])
   const query = useDesktopQuery<ApplicationsData>(
     () => getApplications(range, mappingRules, deferredSearch || undefined),
-    [range, deferredSearch, refreshVersion, mappingRules]
+    [range, deferredSearch, refreshVersion, mappingRules],
+    scopeKey
   )
 
   if (query.loading && !query.data) {
-    return (
-      <EmptyState
-        title="Loading applications"
-        description="Ranking normalized labels."
-      />
-    )
+    return <DataPageSkeleton variant="table" />
   }
   if (query.error && !query.data) {
     return <ErrorState message={query.error} />
@@ -478,7 +485,8 @@ function ApplicationsPage({
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack" aria-busy={query.refreshing}>
+      <RefreshStatus refreshing={query.refreshing} error={query.error} />
       <section className="panel filters-panel">
         <div className="panel-header">
           <div>
@@ -554,9 +562,11 @@ function SettingsPage({
 }) {
   const [applicationSource, setApplicationSource] =
     React.useState<ApplicationSource>("app")
+  const applicationsScopeKey = JSON.stringify(preferences.mappingRules)
   const applications = useDesktopQuery<ApplicationsData>(
     () => getApplications("30d", preferences.mappingRules),
-    [preferences.mappingRules]
+    [preferences.mappingRules],
+    applicationsScopeKey
   )
 
   const visibleApplications =
@@ -748,48 +758,63 @@ function SettingsPage({
             Browser
           </button>
         </div>
-        <div className="toggle-list productive-app-list">
-          {visibleApplications.map((application) => {
-            const checked = preferences.productiveTitles.includes(
-              application.windowTitle
-            )
-            return (
-              <div
-                key={`${application.appClass}-${application.windowTitle}`}
-                className="toggle-row productive-app-row"
-              >
-                <div className="productive-app-copy">
-                  <strong>{application.windowTitle}</strong>
-                  <p>{getApplicationSourceLabel(application.appClass)}</p>
-                </div>
-                <label className="switch">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(event) => {
-                      const nextChecked = event.currentTarget.checked
-                      updatePreferences((current) => ({
-                        ...current,
-                        productiveTitles: nextChecked
-                          ? [
-                              ...new Set([
-                                ...current.productiveTitles,
-                                application.windowTitle,
-                              ]),
-                            ]
-                          : current.productiveTitles.filter(
-                              (candidate) =>
-                                candidate !== application.windowTitle
-                            ),
-                      }))
-                    }}
-                  />
-                  <span />
-                </label>
-              </div>
-            )
-          })}
-        </div>
+        {applications.loading && !applications.data ? (
+          <InlineListSkeleton />
+        ) : applications.error && !applications.data ? (
+          <ErrorState message={applications.error} />
+        ) : (
+          <>
+            <RefreshStatus
+              refreshing={applications.refreshing}
+              error={applications.error}
+            />
+            <div
+              className="toggle-list productive-app-list"
+              aria-busy={applications.refreshing}
+            >
+              {visibleApplications.map((application) => {
+                const checked = preferences.productiveTitles.includes(
+                  application.windowTitle
+                )
+                return (
+                  <div
+                    key={`${application.appClass}-${application.windowTitle}`}
+                    className="toggle-row productive-app-row"
+                  >
+                    <div className="productive-app-copy">
+                      <strong>{application.windowTitle}</strong>
+                      <p>{getApplicationSourceLabel(application.appClass)}</p>
+                    </div>
+                    <label className="switch">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(event) => {
+                          const nextChecked = event.currentTarget.checked
+                          updatePreferences((current) => ({
+                            ...current,
+                            productiveTitles: nextChecked
+                              ? [
+                                  ...new Set([
+                                    ...current.productiveTitles,
+                                    application.windowTitle,
+                                  ]),
+                                ]
+                              : current.productiveTitles.filter(
+                                  (candidate) =>
+                                    candidate !== application.windowTitle
+                                ),
+                          }))
+                        }}
+                      />
+                      <span />
+                    </label>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
       </section>
     </div>
   )

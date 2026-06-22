@@ -34,6 +34,7 @@ vi.mock("@tauri-apps/api/core", () => ({
             label: "Today",
           },
           trackedMinutes: 120,
+          averageTrackedMinutes: 30,
           topApplication: {
             windowTitle: "VS Code",
             appClass: "code",
@@ -79,6 +80,11 @@ vi.mock("@tauri-apps/api/core", () => ({
           },
           comparisons: {
             trackedMinutes: { current: 120, previous: 90, percentChange: 33.33 },
+            averageTrackedMinutesPerActiveDay: {
+              current: 120,
+              previous: 90,
+              percentChange: 33.33,
+            },
             focusContinuity: { current: 50, previous: 40, percentChange: 25 },
             averageSessionMinutes: {
               current: 20,
@@ -219,6 +225,18 @@ describe("App", () => {
     )
   })
 
+  it("uses active-day wording and comparisons for multi-day ranges", async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+    await user.click(await screen.findByRole("button", { name: "7 days" }))
+
+    expect(await screen.findByText("Average active day")).toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Insights" }))
+    expect(await screen.findByText("Average tracked/day")).toBeInTheDocument()
+  })
+
   it("persists a changed focus threshold and uses it for overview analytics", async () => {
     const user = userEvent.setup()
 
@@ -250,6 +268,23 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "Restart Service" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Uninstall Service" })).not.toBeInTheDocument()
     expect(invokeMock).not.toHaveBeenCalledWith("get_tracking_service_status")
+  })
+
+  it("shows an inline loader while productive applications are unavailable", async () => {
+    const user = userEvent.setup()
+    const defaultImplementation = invokeMock.getMockImplementation()!
+    const pendingApplications = new Promise(() => undefined)
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      command === "get_applications"
+        ? pendingApplications
+        : defaultImplementation(command, args)
+    )
+
+    render(<App />)
+    await user.click(await screen.findByRole("button", { name: "Settings" }))
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading applications")
+    invokeMock.mockImplementation(defaultImplementation)
   })
 
   it("renders the last hour coverage box on the activity page", async () => {
