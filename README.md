@@ -31,13 +31,13 @@ is not uploaded anywhere.
 
 ## Install On Arch Linux
 
-The current release is `v0.1.9`. Download the AppImage into a permanent
+The current release is `v0.2.0`. Download the AppImage into a permanent
 location:
 
 ```bash
 mkdir -p ~/.local/bin
 wget -O ~/.local/bin/hyprtrack-desktop.AppImage \
-  https://github.com/wrestle-R/HyprTrack/releases/download/v0.1.9/HyprTrack.Desktop_0.1.9_amd64.AppImage
+  https://github.com/wrestle-R/HyprTrack/releases/download/v0.2.0/HyprTrack.Desktop_0.2.0_amd64.AppImage
 chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
 ```
@@ -62,22 +62,27 @@ HyprTrack can refresh the desktop entry.
 ## Update Without Losing Activity Data
 
 Replacing the AppImage updates the desktop application and exported collector
-script. It does not replace or delete:
+script. It does not replace or delete the existing activity database at:
 
 ```text
 ~/.local/bin/hyprtrack/collector/hyprtrack.db
 ```
 
-Create a SQLite-safe backup first, then replace the AppImage. Change
+Create a SQLite-safe backup first, then replace the AppImage. The commands
+below also record the pre-update row count and integrity result so you can
+confirm the same database is still healthy after the first `0.2.0` launch.
+Change
 `VERSION` to the release you want to install:
 
 ### Update From A Published Release
 
 ```bash
-VERSION=0.1.9
+VERSION=0.2.0
 mkdir -p ~/.local/share/hyprtrack-backups
 database="$HOME/.local/bin/hyprtrack/collector/hyprtrack.db"
 backup="$HOME/.local/share/hyprtrack-backups/hyprtrack-$(date +%Y%m%d-%H%M%S).db"
+before_rows="$(sqlite3 "$database" "SELECT COUNT(*) FROM activity_samples;")"
+before_integrity="$(sqlite3 "$database" "PRAGMA integrity_check;")"
 sqlite3 "$database" ".backup '$backup'"
 
 wget -O ~/.local/bin/hyprtrack-desktop.AppImage.new \
@@ -86,10 +91,19 @@ chmod +x ~/.local/bin/hyprtrack-desktop.AppImage.new
 mv ~/.local/bin/hyprtrack-desktop.AppImage.new \
   ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
+
+after_rows="$(sqlite3 "$database" "SELECT COUNT(*) FROM activity_samples;")"
+after_integrity="$(sqlite3 "$database" "PRAGMA integrity_check;")"
+printf 'Rows before update: %s\nRows after update:  %s\nIntegrity before:  %s\nIntegrity after:   %s\nBackup file:       %s\n' \
+  "$before_rows" "$after_rows" "$before_integrity" "$after_integrity" "$backup"
 ```
 
 Use this option only after that version has been published on the GitHub
 Releases page.
+
+If `Rows before update` and `Rows after update` match and both integrity
+results are `ok`, the AppImage replacement kept the same
+`~/.local/bin/hyprtrack/collector/hyprtrack.db` intact.
 
 ## Start Tracking From Hyprland
 
@@ -129,6 +143,13 @@ are intentionally unsupported so HyprTrack does not conflict with Hyprland
 global bindings.
 
 ## Version History
+
+### v0.2.0 — Release flow catches up with the dashboard
+
+Ships the unreleased dashboard work since `v0.1.9`: default Notion and
+Instagram mappings, more resilient analytics/loading states, the improved
+responsive layouts, and a safer README upgrade flow that verifies the existing
+collector database stays intact during AppImage replacement.
 
 ### v0.1.1 — The desktop era begins
 
