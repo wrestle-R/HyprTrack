@@ -7,7 +7,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 VERSION="$(node -e 'const fs=require("fs"); console.log(JSON.parse(fs.readFileSync("src-tauri/tauri.conf.json","utf8")).version)')"
 EXPECTED_APPIMAGE="HyprTrack.Desktop_${VERSION}_amd64.AppImage"
 
-if [[ "$EXPECTED_APPIMAGE" != "HyprTrack.Desktop_0.2.0_amd64.AppImage" ]]; then
+if [[ "$EXPECTED_APPIMAGE" != "HyprTrack.Desktop_2.0.1_amd64.AppImage" ]]; then
   echo "Unexpected release AppImage name: $EXPECTED_APPIMAGE"
   exit 1
 fi

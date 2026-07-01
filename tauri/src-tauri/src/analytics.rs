@@ -255,6 +255,7 @@ pub struct TimelinePoint {
     pub bucket: String,
     pub label: String,
     pub minutes: f64,
+    pub top_applications: Vec<ApplicationUsage>,
 }
 
 #[derive(Clone, Serialize)]
@@ -787,6 +788,41 @@ fn overlap_minutes(
     }
 }
 
+fn samples_in_bucket(
+    samples: &[ActivitySample],
+    bucket_start: DateTime<FixedOffset>,
+    bucket_end: DateTime<FixedOffset>,
+) -> Vec<ActivitySample> {
+    samples
+        .iter()
+        .filter_map(|sample| {
+            let sample_end = sample
+                .ended_at
+                .unwrap_or_else(|| add_minute(&sample.sampled_at));
+            let overlap_start = if sample.sampled_at > bucket_start {
+                sample.sampled_at
+            } else {
+                bucket_start
+            };
+            let overlap_end = if sample_end < bucket_end {
+                sample_end
+            } else {
+                bucket_end
+            };
+            if overlap_end <= overlap_start {
+                return None;
+            }
+
+            Some(ActivitySample {
+                sampled_at: overlap_start,
+                ended_at: Some(overlap_end),
+                app_class: sample.app_class.clone(),
+                window_title: sample.window_title.clone(),
+            })
+        })
+        .collect()
+}
+
 fn session_interval(
     session: &ActivitySession,
 ) -> Option<(DateTime<FixedOffset>, DateTime<FixedOffset>)> {
@@ -1115,26 +1151,8 @@ fn build_timeline(samples: &[ActivitySample], range: &EffectiveRange) -> Vec<Tim
                 .single()
                 .expect("valid hour");
             let end = start + Duration::hours(1);
-            let minutes: f64 = samples
-                .iter()
-                .map(|sample| {
-                    let sample_end = sample
-                        .ended_at
-                        .unwrap_or_else(|| add_minute(&sample.sampled_at));
-                    let overlap_start = if sample.sampled_at > start {
-                        sample.sampled_at
-                    } else {
-                        start
-                    };
-                    let overlap_end = if sample_end < end { sample_end } else { end };
-                    if overlap_end <= overlap_start {
-                        0.0
-                    } else {
-                        (overlap_end.timestamp_millis() - overlap_start.timestamp_millis()) as f64
-                            / 60_000.0
-                    }
-                })
-                .sum();
+            let bucket_samples = samples_in_bucket(samples, start, end);
+            let minutes: f64 = bucket_samples.iter().map(sample_minutes).sum();
             let label = if hour == range.end.hour() {
                 range.end.format("%-d %b · %-I:%M %P").to_string()
             } else {
@@ -1144,6 +1162,10 @@ fn build_timeline(samples: &[ActivitySample], range: &EffectiveRange) -> Vec<Tim
                 bucket: format!("{}T{hour:02}", range.start.format("%Y-%m-%d")),
                 label,
                 minutes: round_minutes(minutes),
+                top_applications: build_applications(&bucket_samples)
+                    .into_iter()
+                    .take(5)
+                    .collect(),
             });
         }
     } else {
@@ -1151,26 +1173,8 @@ fn build_timeline(samples: &[ActivitySample], range: &EffectiveRange) -> Vec<Tim
         for index in 0..days {
             let start = range.start + Duration::days(index as i64);
             let end = start + Duration::days(1);
-            let minutes: f64 = samples
-                .iter()
-                .map(|sample| {
-                    let sample_end = sample
-                        .ended_at
-                        .unwrap_or_else(|| add_minute(&sample.sampled_at));
-                    let overlap_start = if sample.sampled_at > start {
-                        sample.sampled_at
-                    } else {
-                        start
-                    };
-                    let overlap_end = if sample_end < end { sample_end } else { end };
-                    if overlap_end <= overlap_start {
-                        0.0
-                    } else {
-                        (overlap_end.timestamp_millis() - overlap_start.timestamp_millis()) as f64
-                            / 60_000.0
-                    }
-                })
-                .sum();
+            let bucket_samples = samples_in_bucket(samples, start, end);
+            let minutes: f64 = bucket_samples.iter().map(sample_minutes).sum();
             let label = if index == days - 1 {
                 range.end.format("%-d %b · %-I:%M %P").to_string()
             } else {
@@ -1180,6 +1184,10 @@ fn build_timeline(samples: &[ActivitySample], range: &EffectiveRange) -> Vec<Tim
                 bucket: start.format("%Y-%m-%d").to_string(),
                 label,
                 minutes: round_minutes(minutes),
+                top_applications: build_applications(&bucket_samples)
+                    .into_iter()
+                    .take(5)
+                    .collect(),
             });
         }
     }
@@ -1561,16 +1569,19 @@ mod tests {
                 bucket: "one".to_string(),
                 label: "One".to_string(),
                 minutes: 120.0,
+                top_applications: Vec::new(),
             },
             TimelinePoint {
                 bucket: "two".to_string(),
                 label: "Two".to_string(),
                 minutes: 0.0,
+                top_applications: Vec::new(),
             },
             TimelinePoint {
                 bucket: "three".to_string(),
                 label: "Three".to_string(),
                 minutes: 60.0,
+                top_applications: Vec::new(),
             },
         ];
 
@@ -1601,6 +1612,45 @@ mod tests {
             6
         );
         assert_eq!(timeline[2].minutes, 60.0);
+    }
+
+    #[test]
+    fn timeline_points_include_top_applications_for_their_bucket() {
+        let range = EffectiveRange {
+            key: RANGE_7D.to_string(),
+            start: parse_time("2026-06-08T00:00:00+05:30").unwrap(),
+            end: parse_time("2026-06-14T12:00:00+05:30").unwrap(),
+            label: "7 days".to_string(),
+        };
+        let samples = vec![
+            ActivitySample {
+                sampled_at: parse_time("2026-06-10T09:00:00+05:30").unwrap(),
+                ended_at: Some(parse_time("2026-06-10T10:00:00+05:30").unwrap()),
+                app_class: "code".to_string(),
+                window_title: "VS Code".to_string(),
+            },
+            ActivitySample {
+                sampled_at: parse_time("2026-06-10T10:00:00+05:30").unwrap(),
+                ended_at: Some(parse_time("2026-06-10T10:45:00+05:30").unwrap()),
+                app_class: "zen".to_string(),
+                window_title: "GitHub".to_string(),
+            },
+            ActivitySample {
+                sampled_at: parse_time("2026-06-10T11:00:00+05:30").unwrap(),
+                ended_at: Some(parse_time("2026-06-10T11:10:00+05:30").unwrap()),
+                app_class: "terminal".to_string(),
+                window_title: "Terminal".to_string(),
+            },
+        ];
+
+        let timeline = build_timeline(&samples, &range);
+        let active_day = &timeline[2];
+
+        assert_eq!(active_day.top_applications.len(), 3);
+        assert_eq!(active_day.top_applications[0].window_title, "VS Code");
+        assert_eq!(active_day.top_applications[0].minutes, 60.0);
+        assert_eq!(active_day.top_applications[1].window_title, "GitHub");
+        assert_eq!(active_day.top_applications[1].minutes, 45.0);
     }
 
     #[test]

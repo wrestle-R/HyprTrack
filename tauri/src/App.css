@@ -381,6 +381,11 @@ select:focus-visible {
   box-shadow: inset 0 0 0 1px var(--border);
 }
 
+.button.slim {
+  padding: 0.52rem 0.78rem;
+  font-size: 0.8rem;
+}
+
 .button.ghost {
   background: transparent;
   color: var(--primary);
@@ -701,6 +706,10 @@ select:focus-visible {
   margin-bottom: 1rem;
 }
 
+.panel-header.compact {
+  align-items: flex-start;
+}
+
 .panel-header h2 {
   font-size: 1.24rem;
 }
@@ -799,6 +808,161 @@ select:focus-visible {
 
 .focus-quality-panel {
   overflow: hidden;
+}
+
+.overview-insight-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.focus-quality-card,
+.top-applications-panel {
+  min-height: 22rem;
+}
+
+.focus-stack {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.focus-stack .metric-card,
+.top-app-row {
+  box-shadow: none;
+  background: color-mix(in oklab, var(--muted) 35%, var(--card));
+}
+
+.top-applications-panel {
+  overflow: hidden;
+}
+
+.timeline-day-strip {
+  display: flex;
+  gap: 0.45rem;
+  margin: -0.15rem 0 0.9rem;
+  padding-bottom: 0.15rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.timeline-day-strip::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.timeline-day-strip button {
+  min-width: 4.9rem;
+  padding: 0.48rem 0.58rem;
+  color: inherit;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  cursor: pointer;
+}
+
+.timeline-day-strip button.active {
+  border-color: color-mix(in oklab, var(--primary) 54%, var(--border));
+  background: color-mix(in oklab, var(--primary) 12%, var(--card));
+}
+
+.timeline-day-strip button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.timeline-day-strip span,
+.timeline-day-strip strong {
+  display: block;
+}
+
+.timeline-day-strip span {
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+}
+
+.timeline-day-strip strong {
+  margin-top: 0.08rem;
+  font-size: 0.82rem;
+}
+
+.top-app-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.top-app-row {
+  display: grid;
+  grid-template-columns: 1.8rem minmax(0, 1fr);
+  gap: 0.72rem;
+  align-items: center;
+  padding: 0.78rem;
+  border: 1px solid color-mix(in oklab, var(--primary) 10%, var(--border));
+  border-radius: 0.95rem;
+}
+
+.top-app-rank {
+  width: 1.65rem;
+  height: 1.65rem;
+  display: inline-grid;
+  place-items: center;
+  color: var(--primary);
+  font-family: "Bricolage Grotesque", "Outfit", sans-serif;
+  font-weight: 700;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+}
+
+.top-app-main {
+  min-width: 0;
+}
+
+.top-app-row-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.top-app-row-header strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-app-row-header span,
+.top-app-main small {
+  color: var(--muted-foreground);
+}
+
+.top-app-row-header span {
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.top-app-main small {
+  display: block;
+  margin-top: 0.36rem;
+  font-size: 0.72rem;
+}
+
+.mini-empty-state {
+  display: grid;
+  gap: 0.2rem;
+  min-height: 10rem;
+  place-content: center;
+  text-align: center;
+  color: var(--muted-foreground);
+  border: 1px dashed var(--border);
+  border-radius: 1rem;
+  background: color-mix(in oklab, var(--muted) 28%, transparent);
+}
+
+.mini-empty-state strong {
+  color: var(--foreground);
 }
 
 .focus-score {
@@ -1535,6 +1699,10 @@ select:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .overview-insight-grid {
+    grid-template-columns: 1fr;
+  }
+
   .hero-panel h1 {
     font-size: clamp(1.75rem, 4vw, 2.35rem);
   }
@@ -1677,6 +1845,7 @@ select:focus-visible {
 
   .rhythm-panel .panel-header,
   .focus-quality-panel .panel-header,
+  .top-applications-panel .panel-header,
   .trend-panel .panel-header {
     flex-direction: column;
   }
@@ -1752,6 +1921,17 @@ select:focus-visible {
     gap: 1px;
     padding: 0.22rem;
     border-radius: 0.68rem;
+  }
+
+  .top-app-row {
+    grid-template-columns: 1.55rem minmax(0, 1fr);
+    padding: 0.68rem;
+  }
+
+  .top-app-row-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.16rem;
   }
 }
 

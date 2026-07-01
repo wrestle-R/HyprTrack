@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react"
+import { useEffect, useState, type CSSProperties } from "react"
 import {
   Area,
   AreaChart,
@@ -22,6 +22,7 @@ import {
 } from "../lib/format"
 import type { MappingRule } from "../lib/mappings"
 import type {
+  ApplicationUsage,
   ComparisonValue,
   DailyInsightPoint,
   InsightsData,
@@ -194,6 +195,159 @@ function formatHourWindow(hour: number) {
   return `${start}–${end} ${period}`
 }
 
+function chartEventPoint(event: unknown): TimelinePoint | null {
+  if (
+    typeof event !== "object" ||
+    event === null ||
+    !("activePayload" in event)
+  ) {
+    return null
+  }
+
+  const activePayload = (event as { activePayload?: unknown }).activePayload
+  if (!Array.isArray(activePayload)) {
+    return null
+  }
+
+  const payload = activePayload[0] as { payload?: TimelinePoint } | undefined
+  return payload?.payload ?? null
+}
+
+function compactTimelineLabel(label: string) {
+  return label.split(" · ")[0] ?? label
+}
+
+function ApplicationRankList({
+  applications,
+  totalMinutes,
+}: {
+  applications: ApplicationUsage[]
+  totalMinutes: number
+}) {
+  if (applications.length === 0) {
+    return (
+      <div className="mini-empty-state">
+        <strong>No applications here</strong>
+        <span>Pick another active day from the chart.</span>
+      </div>
+    )
+  }
+
+  const maxMinutes = Math.max(1, ...applications.map((app) => app.minutes))
+
+  return (
+    <div className="top-app-list">
+      {applications.slice(0, 5).map((app, index) => {
+        const share =
+          totalMinutes > 0 ? Math.round((app.minutes / totalMinutes) * 100) : 0
+        return (
+          <div className="top-app-row" key={`${app.appClass}-${app.windowTitle}`}>
+            <span className="top-app-rank">{index + 1}</span>
+            <div className="top-app-main">
+              <div className="top-app-row-header">
+                <strong>{app.windowTitle}</strong>
+                <span>{formatDuration(app.minutes)}</span>
+              </div>
+              <div className="usage-bar inline" aria-hidden="true">
+                <div
+                  style={{
+                    width: `${Math.max(5, (app.minutes / maxMinutes) * 100)}%`,
+                  }}
+                />
+              </div>
+              <small>
+                {share}% of {formatDuration(totalMinutes)}
+              </small>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export function TimelineTopApplicationsPanel({
+  applications,
+  timeline,
+  range,
+  selectedPoint,
+  onSelectPoint,
+}: {
+  applications: ApplicationUsage[]
+  timeline: TimelinePoint[]
+  range: RangeKey
+  selectedPoint?: TimelinePoint | null
+  onSelectPoint?: (point: TimelinePoint | null) => void
+}) {
+  const [internalPoint, setInternalPoint] = useState<TimelinePoint | null>(null)
+  const activePoint = selectedPoint === undefined ? internalPoint : selectedPoint
+  const isMultiDay = range !== "today"
+  const visiblePoint = isMultiDay ? activePoint : null
+  const visibleApplications = visiblePoint
+    ? visiblePoint.topApplications
+    : applications.slice(0, 5)
+  const totalMinutes = visiblePoint
+    ? visiblePoint.minutes
+    : applications.reduce((total, app) => total + app.minutes, 0)
+
+  const selectPoint = (point: TimelinePoint | null) => {
+    if (selectedPoint === undefined) {
+      setInternalPoint(point)
+    }
+    onSelectPoint?.(point)
+  }
+
+  return (
+    <section className="panel top-applications-panel">
+      <div className="panel-header compact">
+        <div>
+          <p className="eyebrow">Application mix</p>
+          <h2>Top 5 applications</h2>
+          <p>
+            {visiblePoint
+              ? `Showing ${compactTimelineLabel(visiblePoint.label)}`
+              : "Across the selected range"}
+          </p>
+        </div>
+        {visiblePoint ? (
+          <button
+            className="button secondary slim"
+            type="button"
+            onClick={() => selectPoint(null)}
+          >
+            Range
+          </button>
+        ) : null}
+      </div>
+
+      {isMultiDay ? (
+        <div className="timeline-day-strip" aria-label="Select day">
+          {timeline.map((point) => (
+            <button
+              className={point.bucket === visiblePoint?.bucket ? "active" : ""}
+              disabled={point.minutes === 0}
+              key={point.bucket}
+              type="button"
+              onClick={() => selectPoint(point)}
+              aria-label={`Show ${compactTimelineLabel(
+                point.label
+              )} top applications`}
+            >
+              <span>{compactTimelineLabel(point.label)}</span>
+              <strong>{formatDuration(point.minutes)}</strong>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <ApplicationRankList
+        applications={visibleApplications}
+        totalMinutes={totalMinutes}
+      />
+    </section>
+  )
+}
+
 export function RhythmRail({ cells }: { cells: InsightsData["rhythm"] }) {
   const maxTracked = Math.max(1, ...cells.map((cell) => cell.trackedMinutes))
   const peak = cells.reduce<(typeof cells)[number] | null>(
@@ -291,6 +445,19 @@ export function OverviewPage({
     [range, refreshVersion, focusThresholdMinutes, mappingRules],
     scopeKey
   )
+  const [selectedTimelinePoint, setSelectedTimelinePoint] =
+    useState<TimelinePoint | null>(null)
+
+  useEffect(() => {
+    if (
+      range === "today" ||
+      !query.data?.timeline.some(
+        (point) => point.bucket === selectedTimelinePoint?.bucket
+      )
+    ) {
+      setSelectedTimelinePoint(null)
+    }
+  }, [query.data?.timeline, range, selectedTimelinePoint?.bucket])
 
   if (query.loading && !query.data) {
     return <DataPageSkeleton variant="overview" />
@@ -400,6 +567,15 @@ export function OverviewPage({
             <AreaChart
               data={data.timeline}
               margin={{ top: 28, right: 24, left: -12, bottom: 0 }}
+              onClick={(event) => {
+                if (range === "today") {
+                  return
+                }
+                const point = chartEventPoint(event)
+                if (point && point.minutes > 0) {
+                  setSelectedTimelinePoint(point)
+                }
+              }}
             >
               <defs>
                 <linearGradient id="activityArea" x1="0" y1="0" x2="0" y2="1">
@@ -494,48 +670,52 @@ export function OverviewPage({
         </div>
       </section>
 
-      <section className="panel focus-quality-panel">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Attention continuity</p>
-            <h2>Focus quality</h2>
-            <p>
-              Uninterrupted sessions lasting at least {focusThresholdMinutes}{" "}
-              minutes.
-            </p>
+      <div className="overview-insight-grid">
+        <section className="panel focus-quality-panel focus-quality-card">
+          <div className="panel-header compact">
+            <div>
+              <p className="eyebrow">Attention continuity</p>
+              <h2>Focus quality</h2>
+              <p>
+                Sessions over {focusThresholdMinutes} minutes count as focused.
+              </p>
+            </div>
+            <div className="focus-score">
+              <strong>{Math.round(data.focusQuality.continuityPercent)}%</strong>
+              <span>continuity</span>
+            </div>
           </div>
-          <div className="focus-score">
-            <strong>{Math.round(data.focusQuality.continuityPercent)}%</strong>
-            <span>continuity</span>
+          <div className="focus-stack">
+            <Metric
+              label="Focused time"
+              value={formatDuration(data.focusQuality.focusedMinutes)}
+              detail="Inside qualifying focus blocks"
+            />
+            <Metric
+              label="Longest block"
+              value={formatDuration(
+                data.focusQuality.longestFocusedBlockMinutes
+              )}
+              detail="Best uninterrupted session"
+            />
+            <Metric
+              label="Context switches"
+              value={String(data.focusQuality.contextSwitches)}
+              detail={`${data.focusQuality.switchesPerTrackedHour.toFixed(
+                1
+              )} per tracked hour`}
+            />
           </div>
-        </div>
-        <div className="focus-metrics-grid">
-          <Metric
-            label="Focused time"
-            value={formatDuration(data.focusQuality.focusedMinutes)}
-            detail="Time inside qualifying focus blocks"
-          />
-          <Metric
-            label="Longest block"
-            value={formatDuration(
-              data.focusQuality.longestFocusedBlockMinutes
-            )}
-            detail="Longest uninterrupted session"
-          />
-          <Metric
-            label="Average session"
-            value={formatDuration(data.focusQuality.averageSessionMinutes)}
-            detail="Across all grouped sessions"
-          />
-          <Metric
-            label="Context switches"
-            value={String(data.focusQuality.contextSwitches)}
-            detail={`${data.focusQuality.switchesPerTrackedHour.toFixed(
-              1
-            )} per tracked hour`}
-          />
-        </div>
-      </section>
+        </section>
+
+        <TimelineTopApplicationsPanel
+          applications={data.applications}
+          timeline={data.timeline}
+          range={range}
+          selectedPoint={selectedTimelinePoint}
+          onSelectPoint={setSelectedTimelinePoint}
+        />
+      </div>
     </div>
   )
 }

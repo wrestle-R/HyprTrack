@@ -1,12 +1,27 @@
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { describe, expect, it } from "vitest"
 
-import type { RhythmCell } from "../lib/types"
+import type { ApplicationUsage, RhythmCell, TimelinePoint } from "../lib/types"
 import {
   ActivityTooltip,
+  TimelineTopApplicationsPanel,
   RhythmRail,
   trackedTimeComparisonLabel,
 } from "./analytics-pages"
+
+function appUsage(windowTitle: string, minutes: number): ApplicationUsage {
+  return {
+    windowTitle,
+    appClass: windowTitle.toLowerCase().replace(/\s+/g, "-"),
+    minutes,
+    share: minutes,
+    sessionCount: 1,
+    firstSeen: "2026-06-14T09:00:00+05:30",
+    lastSeen: "2026-06-14T10:00:00+05:30",
+    recentSessions: [],
+  }
+}
 
 describe("activity rhythm tooltip", () => {
   it("shows duration and difference from the selected-range average", () => {
@@ -20,6 +35,7 @@ describe("activity rhythm tooltip", () => {
               bucket: "2026-06-14T10",
               label: "10:00",
               minutes: 45,
+              topApplications: [],
             },
             value: 45,
           },
@@ -38,6 +54,43 @@ describe("tracked time comparison label", () => {
     expect(trackedTimeComparisonLabel("today")).toBe("Tracked time")
     expect(trackedTimeComparisonLabel("7d")).toBe("Average tracked/day")
     expect(trackedTimeComparisonLabel("30d")).toBe("Average tracked/day")
+  })
+})
+
+describe("timeline top applications panel", () => {
+  const timeline: TimelinePoint[] = [
+    {
+      bucket: "2026-06-13",
+      label: "Jun 13",
+      minutes: 30,
+      topApplications: [appUsage("Terminal", 30)],
+    },
+    {
+      bucket: "2026-06-14",
+      label: "14 Jun · 12:00 pm",
+      minutes: 90,
+      topApplications: [appUsage("VS Code", 60), appUsage("GitHub", 30)],
+    },
+  ]
+
+  it("shows range top applications until a multi-day timeline point is selected", async () => {
+    const user = userEvent.setup()
+
+    render(
+      <TimelineTopApplicationsPanel
+        applications={[appUsage("Chrome", 120)]}
+        timeline={timeline}
+        range="7d"
+      />
+    )
+
+    expect(screen.getByText("Top 5 applications")).toBeInTheDocument()
+    expect(screen.getByText("Chrome")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: /show jun 13/i }))
+
+    expect(screen.getByText("Jun 13")).toBeInTheDocument()
+    expect(screen.getByText("Terminal")).toBeInTheDocument()
+    expect(screen.queryByText("Chrome")).not.toBeInTheDocument()
   })
 })
 

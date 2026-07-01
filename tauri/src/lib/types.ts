@@ -31,6 +31,7 @@ export type TimelinePoint = {
   bucket: string
   label: string
   minutes: number
+  topApplications: ApplicationUsage[]
 }
 
 export type FocusQuality = {

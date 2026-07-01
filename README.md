@@ -31,13 +31,13 @@ is not uploaded anywhere.
 
 ## Install On Arch Linux
 
-The current release is `v0.2.0`. Download the AppImage into a permanent
+The current release is `v2.0.1`. Download the AppImage into a permanent
 location:
 
 ```bash
 mkdir -p ~/.local/bin
 wget -O ~/.local/bin/hyprtrack-desktop.AppImage \
-  https://github.com/wrestle-R/HyprTrack/releases/download/v0.2.0/HyprTrack.Desktop_0.2.0_amd64.AppImage
+  https://github.com/wrestle-R/HyprTrack/releases/download/v2.0.1/HyprTrack.Desktop_2.0.1_amd64.AppImage
 chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
 ```
@@ -70,14 +70,14 @@ script. It does not replace or delete the existing activity database at:
 
 Create a SQLite-safe backup first, then replace the AppImage. The commands
 below also record the pre-update row count and integrity result so you can
-confirm the same database is still healthy after the first `0.2.0` launch.
+confirm the same database is still healthy after the first `2.0.1` launch.
 Change
 `VERSION` to the release you want to install:
 
 ### Update From A Published Release
 
 ```bash
-VERSION=0.2.0
+VERSION=2.0.1
 mkdir -p ~/.local/share/hyprtrack-backups
 database="$HOME/.local/bin/hyprtrack/collector/hyprtrack.db"
 backup="$HOME/.local/share/hyprtrack-backups/hyprtrack-$(date +%Y%m%d-%H%M%S).db"
@@ -143,6 +143,12 @@ are intentionally unsupported so HyprTrack does not conflict with Hyprland
 global bindings.
 
 ## Version History
+
+### v2.0.1 — Overview reads the day properly
+
+Adds the Overview Top 5 application panel next to focus quality and lets the
+7-day and 30-day rhythm chart drill into a selected day’s top applications.
+The release keeps the existing local SQLite database and update flow intact.
 
 ### v0.2.0 — Release flow catches up with the dashboard
 
