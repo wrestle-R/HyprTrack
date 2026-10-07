@@ -6,7 +6,7 @@ collector/
 .env*
 agents/
 .superpowers/
-docs/
+/docs/
 next/node_modules/
 next/.next/
 next/.vercel/
