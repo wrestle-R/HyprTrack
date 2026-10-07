@@ -1,6 +1,12 @@
-*
-!next/
-!next/**
+tauri/
+collector/
+.git/
+.github/
+.vercel/
+.env*
+agents/
+.superpowers/
+docs/
 next/node_modules/
 next/.next/
 next/.vercel/
