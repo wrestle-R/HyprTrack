@@ -18,6 +18,10 @@ on your machine.
 
 ![HyprTrack Desktop in dark mode](tauri/public/dark_screenshot.png)
 
+### Pomodoro timer
+
+![The compact Pomodoro timer in HyprTrack Desktop](tauri/public/pomodoro_screenshot.png)
+
 ## Supported Platform
 
 - x86_64 Arch Linux
@@ -31,13 +35,13 @@ is not uploaded anywhere.
 
 ## Install On Arch Linux
 
-The current release is `v2.0.3`. Download the AppImage into a permanent
+The current release is `v2.1.0`. Download the AppImage into a permanent
 location:
 
 ```bash
 mkdir -p ~/.local/bin
 wget -O ~/.local/bin/hyprtrack-desktop.AppImage \
-  https://github.com/wrestle-R/HyprTrack/releases/download/v2.0.3/HyprTrack.Desktop_2.0.3_amd64.AppImage
+  https://github.com/wrestle-R/HyprTrack/releases/download/v2.1.0/HyprTrack.Desktop_2.1.0_amd64.AppImage
 chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
 ```
@@ -70,14 +74,14 @@ script. It does not replace or delete the existing activity database at:
 
 Create a SQLite-safe backup first, then replace the AppImage. The commands
 below also record the pre-update row count and integrity result so you can
-confirm the same database is still healthy after the first `2.0.3` launch.
+confirm the same database is still healthy after the first `2.1.0` launch.
 Change
 `VERSION` to the release you want to install:
 
 ### Update From A Published Release
 
 ```bash
-VERSION=2.0.3
+VERSION=2.1.0
 mkdir -p ~/.local/share/hyprtrack-backups
 database="$HOME/.local/bin/hyprtrack/collector/hyprtrack.db"
 backup="$HOME/.local/share/hyprtrack-backups/hyprtrack-$(date +%Y%m%d-%H%M%S).db"
@@ -134,8 +138,12 @@ and uses a lock file beside the database to avoid duplicate writers.
 - Editable title mappings that clean up current and historical dashboard labels
   without rewriting the SQLite database
 - App-local keybindings with duplicate and unsafe-shortcut validation
-- Light, dark, font-size, sidebar-width, date-range, and productive-label
-  preferences
+- Six MultiCodex palettes: Sage, Ocean, Sand, Rose, Plum, and Orange, each in
+  light, dark, or system mode, with animated appearance changes
+- Compact persistent Pomodoro timer with pause/resume, 15/25/45/60-minute focus
+  blocks, short and long breaks, daily session counts, and an optional chime
+- Font-size, sidebar-width, date-range, and productive-label preferences
+- Consistent VS Code labels, including historical `com.microsoft.VSCode` activity
 
 Mappings and keybindings are stored locally with the desktop preferences.
 Shortcuts work only while the HyprTrack window is focused. Super/Meta shortcuts
@@ -143,6 +151,25 @@ are intentionally unsupported so HyprTrack does not conflict with Hyprland
 global bindings.
 
 ## Version History
+
+### v2.1.0 — A clearer workspace, a little time to focus
+
+Redesigns the desktop workspace with calmer navigation, a compact metric strip,
+cleaner charts and tables, and a new appearance panel. Adds the same six palettes
+as MultiCodex with light, dark, and system modes, circular theme transitions where
+supported, and a gentle fade on older WebKit versions. Reduced-motion preferences
+skip decorative animations.
+
+The new compact Pomodoro timer remembers its deadline across navigation, hiding,
+and reopening the app. Focus blocks are 15, 25, 45, or 60 minutes, with 5-minute
+breaks and a 15-minute break after four completed focus sessions. Breaks start
+manually, and the completion chime is optional. The timer does not need the
+activity collector to run; completion sounds play while the app is running.
+
+Normalizes `com.microsoft.VSCode` and other editor aliases to **VS Code** in current
+and historical analytics. Existing activity rows remain unchanged. Preferences
+upgrade in place, retaining custom mappings, keybindings, and selected productive
+apps.
 
 ### v2.0.3 — Overview reads the day properly
 

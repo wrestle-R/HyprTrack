@@ -27,6 +27,8 @@ IST = timezone(timedelta(hours=5, minutes=30), name="IST")
 APP_LABELS = {
     "code": "VS Code",
     "code-oss": "VS Code",
+    "com.microsoft.vscode": "VS Code",
+    "vscode": "VS Code",
     "visual studio code": "VS Code",
     "kitty": "Terminal",
     "com.stremio.stremio": "Stremio",

@@ -14,6 +14,11 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { listen } from "@tauri-apps/api/event"
 
 import "./App.css"
+import "./themes.css"
+import "./redesign.css"
+import { PomodoroTimer } from "./components/pomodoro-timer"
+import { ThemeOptions, ThemePicker } from "./components/theme-picker"
+import { changeAppearance } from "./lib/theme-transition"
 import {
   InsightsPage,
   OverviewPage,
@@ -100,8 +105,15 @@ function useDesktopPreferences() {
       const next =
         typeof update === "function"
           ? update(current)
-          : { ...current, ...update, version: 3 as const }
-      writePreferences(next)
+          : { ...current, ...update, version: 4 as const }
+      const save = () => {
+        const dark = next.theme === "dark" || (next.theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)
+        document.documentElement.classList.toggle("dark", dark)
+        document.documentElement.dataset.palette = next.colorTheme
+        writePreferences(next)
+      }
+      if (next.theme !== current.theme || next.colorTheme !== current.colorTheme) changeAppearance(save)
+      else save()
     },
     []
   )
@@ -212,6 +224,7 @@ function RangeControl({
         <button
           key={option}
           className={range === option ? "active" : ""}
+          aria-pressed={range === option}
           type="button"
           onClick={() => onChange(option)}
         >
@@ -349,7 +362,7 @@ function ActivityPage({
         <div className="panel-header">
           <div>
             <h2>Activity</h2>
-            <p>Inspect grouped focus sessions without exposing raw database rows.</p>
+            <p>A timeline of your apps, windows, and focus sessions.</p>
           </div>
           <span className="pill">{query.data.range.label}</span>
         </div>
@@ -359,10 +372,12 @@ function ActivityPage({
             value={search}
             onChange={(event) => setSearch(event.currentTarget.value)}
             placeholder="Search application class or title"
+            aria-label="Search activity"
             data-page-search
           />
           <select
             className="select"
+            aria-label="Filter by application"
             value={app}
             onChange={(event) => setApp(event.currentTarget.value)}
           >
@@ -404,7 +419,7 @@ function ActivityPage({
                 <tr
                   key={`${session.startAt}-${session.appClass}-${session.windowTitle}`}
                 >
-                  <td>{session.windowTitle}</td>
+                  <td><strong>{session.windowTitle}</strong></td>
                   <td>{session.appClass}</td>
                   <td>{formatTimestamp(session.startAt, true)}</td>
                   <td>{formatTimestamp(session.endAt, true)}</td>
@@ -491,7 +506,7 @@ function ApplicationsPage({
         <div className="panel-header">
           <div>
             <h2>Applications</h2>
-            <p>Compare normalized window labels, session counts, and usage share.</p>
+            <p>The tools you spend time with, ranked by usage.</p>
           </div>
           <span className="pill">{query.data.range.label}</span>
         </div>
@@ -501,6 +516,7 @@ function ApplicationsPage({
             value={search}
             onChange={(event) => setSearch(event.currentTarget.value)}
             placeholder="Search applications"
+            aria-label="Search applications"
             data-page-search
           />
           <span className="subtle-copy">
@@ -582,9 +598,11 @@ function SettingsPage({
           <div className="panel-header">
             <div>
               <h2>Appearance</h2>
-              <p>Keep the desktop app aligned with the web theme tokens.</p>
+              <p>A palette for every mood. All six work in light and dark.</p>
             </div>
           </div>
+          <ThemeOptions value={preferences.colorTheme} onChange={(colorTheme) => updatePreferences({ colorTheme })} />
+          <div className="appearance-mode-label">Display mode</div>
           <div className="toggle-grid">
             {(["system", "light", "dark"] as const).map((theme) => (
               <button
@@ -593,9 +611,10 @@ function SettingsPage({
                   preferences.theme === theme ? "primary" : "secondary"
                 }`}
                 type="button"
+                aria-pressed={preferences.theme === theme}
                 onClick={() => updatePreferences({ theme })}
               >
-                {theme}
+                {theme.charAt(0).toUpperCase() + theme.slice(1)}
               </button>
             ))}
           </div>
@@ -735,7 +754,7 @@ function SettingsPage({
         <div className="panel-header">
           <div>
             <h2>Productive applications</h2>
-            <p>Choose productive labels separately for apps and browser windows.</p>
+            <p>Choose which apps and browser windows count toward productive time.</p>
           </div>
         </div>
         <div className="toggle-grid source-grid">
@@ -788,6 +807,7 @@ function SettingsPage({
                     <label className="switch">
                       <input
                         type="checkbox"
+                        aria-label={`Count ${application.windowTitle} as productive`}
                         checked={checked}
                         onChange={(event) => {
                           const nextChecked = event.currentTarget.checked
@@ -838,8 +858,9 @@ function App() {
     }
   }, [page])
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     document.documentElement.classList.toggle("dark", resolvedTheme === "dark")
+    document.documentElement.dataset.palette = preferences.colorTheme
     document.documentElement.style.fontSize = FONT_SIZE_PIXELS[preferences.fontSize]
     document.documentElement.style.setProperty(
       "--desktop-sidebar-width",
@@ -849,7 +870,7 @@ function App() {
       document.documentElement.style.removeProperty("font-size")
       document.documentElement.style.removeProperty("--desktop-sidebar-width")
     }
-  }, [preferences.fontSize, preferences.sidebarWidth, resolvedTheme])
+  }, [preferences.fontSize, preferences.sidebarWidth, preferences.colorTheme, resolvedTheme])
 
   const requestRefresh = React.useCallback(() => {
     setRefreshRequestedAt(new Date())
@@ -970,11 +991,13 @@ function App() {
 
   return (
     <div className="desktop-shell">
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <aside className="sidebar">
         <div className="brand-block">
           <HyprTrackMark className="brand-mark" title="HyprTrack" />
           <div>
             <strong>HyprTrack</strong>
+            <span className="brand-caption">Your day, in perspective.</span>
           </div>
         </div>
         <nav className="nav-stack" aria-label="Primary navigation">
@@ -985,6 +1008,7 @@ function App() {
               type="button"
               onClick={() => setPage(item.id)}
               aria-label={item.label}
+              aria-current={page === item.id ? "page" : undefined}
             >
               <HugeiconsIcon icon={item.icon} strokeWidth={1.8} />
               <strong>{item.label}</strong>
@@ -997,16 +1021,18 @@ function App() {
             type="button"
             onClick={() => setPage("keybindings")}
             aria-label="Keybindings"
+            aria-current={page === "keybindings" ? "page" : undefined}
           >
             <HugeiconsIcon icon={KEYBINDINGS_PAGE.icon} strokeWidth={1.8} />
             <strong>Keybindings</strong>
           </button>
         </nav>
+        <div className="sidebar-footer"><span className="local-status-dot" /><div><strong>Just on this device</strong><span>Private by default</span></div></div>
       </aside>
 
       <main className="workspace">
         <header className="topbar">
-          <h2>{pageTitle}</h2>
+          <div className="page-heading"><span className="page-breadcrumb">Your workspace</span><h2>{pageTitle}</h2></div>
           <div className="topbar-actions">
             {isDataPage ? (
               <>
@@ -1036,6 +1062,8 @@ function App() {
                 <span className="header-button-label">Refresh</span>
               </button>
             ) : null}
+            <PomodoroTimer />
+            <ThemePicker value={preferences.colorTheme} onChange={(colorTheme) => updatePreferences({ colorTheme })} />
             <ThemeIconToggle
               isDark={resolvedTheme === "dark"}
               onToggle={() =>
@@ -1047,7 +1075,7 @@ function App() {
           </div>
         </header>
 
-        <section className="content-area" ref={contentAreaRef}>
+        <section className="content-area" id="main-content" tabIndex={-1} ref={contentAreaRef}>
           {page === "overview" ? (
             <OverviewPage
               range={range}

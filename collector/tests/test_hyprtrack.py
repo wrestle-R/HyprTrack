@@ -510,6 +510,9 @@ class HyprTrackTests(unittest.TestCase):
             hyprtrack.normalize_window_title("code", title),
             "VS Code",
         )
+        for app_class in ("com.microsoft.VSCode", "code-oss", "vscode"):
+            with self.subTest(app_class=app_class):
+                self.assertEqual(hyprtrack.normalize_window_title(app_class, title), "VS Code")
 
         self.assertEqual(
             hyprtrack.normalize_window_title(

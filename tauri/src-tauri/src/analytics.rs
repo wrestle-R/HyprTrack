@@ -36,6 +36,9 @@ pub struct MappingRule {
 fn normalize_native_app_label(class_key: &str) -> Option<&'static str> {
     match class_key {
         "tauri" => Some("HyprTrack Desktop App"),
+        "com.microsoft.vscode" | "code" | "code-oss" | "vscode" | "visual studio code" => {
+            Some("VS Code")
+        }
         _ => None,
     }
 }
@@ -107,6 +110,10 @@ fn normalize_display_labels_with_mappings(
     let folded_source_title = source_title.to_lowercase();
 
     for default_group in [false, true] {
+        // Repository names in editor titles should not become browser labels.
+        if default_group && normalize_native_app_label(&class_key) == Some("VS Code") {
+            break;
+        }
         if let Some(rule) = mapping_rules.iter().find(|rule| {
             rule.enabled
                 && rule.is_default == default_group
@@ -118,11 +125,12 @@ fn normalize_display_labels_with_mappings(
     }
 
     if let Some(label) = normalize_native_app_label(&class_key) {
-        let next_title = if window_title.trim().eq_ignore_ascii_case(&class_key) {
-            label.to_string()
-        } else {
-            window_title.to_string()
-        };
+        let next_title =
+            if label == "VS Code" || window_title.trim().eq_ignore_ascii_case(&class_key) {
+                label.to_string()
+            } else {
+                window_title.to_string()
+            };
         return (label.to_string(), next_title);
     }
 
@@ -1689,6 +1697,50 @@ mod tests {
         assert_eq!(rhythm.len(), 24);
         assert_eq!(rhythm[9].tracked_minutes, 30.0);
         assert_eq!(rhythm[9].focused_minutes, 30.0);
+    }
+
+    #[test]
+    fn vscode_classes_share_one_label_without_rewriting_history() {
+        let directory = tempdir().unwrap();
+        let database = directory.path().join("hyprtrack.db");
+        initialize_database(&database).unwrap();
+        let connection = Connection::open(&database).unwrap();
+        let now = Utc::now();
+        let rules = vec![MappingRule {
+            _id: "default-github".into(),
+            match_text: "github".into(),
+            display_label: "GitHub".into(),
+            enabled: true,
+            is_default: true,
+        }];
+        for class in ["com.microsoft.VSCode", "code", "code-oss", "vscode"] {
+            connection.execute(
+                "INSERT INTO activity_samples (sampled_at, app_class, window_title, window_full, ended_at) VALUES (?1, ?2, ?2, 'GitHub - Visual Studio Code', ?3)",
+                ((now - Duration::minutes(30)).to_rfc3339(), class, (now - Duration::minutes(1)).to_rfc3339()),
+            ).unwrap();
+            assert_eq!(
+                normalize_display_labels_with_mappings(
+                    class,
+                    class,
+                    Some("GitHub - Visual Studio Code"),
+                    &rules
+                ),
+                ("VS Code".into(), "VS Code".into())
+            );
+        }
+        let applications =
+            read_applications(database.to_str().unwrap(), "30d", None, &rules).unwrap();
+        assert_eq!(applications.items.len(), 1);
+        assert_eq!(applications.items[0].app_class, "VS Code");
+        assert_eq!(applications.items[0].window_title, "VS Code");
+        let raw_class: String = connection
+            .query_row(
+                "SELECT app_class FROM activity_samples ORDER BY id LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(raw_class, "com.microsoft.VSCode");
     }
 
     #[test]

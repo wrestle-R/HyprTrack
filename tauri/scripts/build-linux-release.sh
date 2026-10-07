@@ -115,6 +115,7 @@ rm -rf "$bundle_dir"
 
 npm test
 npm run build
+python3 -m unittest discover -s ../collector/tests
 cargo test --manifest-path src-tauri/Cargo.toml
 npm run tauri -- build --bundles deb,rpm
 
@@ -160,7 +161,10 @@ mv "${generated[0]}" "$appimage_dir/$artifact_name"
 
 find "$bundle_dir" \
   -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) \
-  -print0 | sort -z | xargs -0 sha256sum > "$ROOT_DIR/SHA256SUMS"
+  -print0 | sort -z | while IFS= read -r -d '' artifact; do
+    artifact_checksum="$(sha256sum "$artifact")"
+    printf '%s  %s\n' "${artifact_checksum%% *}" "$(basename "$artifact")"
+  done > "$ROOT_DIR/SHA256SUMS"
 
 echo "Linux release artifacts:"
 find "$bundle_dir" \

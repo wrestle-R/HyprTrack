@@ -487,19 +487,18 @@ export function OverviewPage({
   )
 
   return (
-    <div className="page-stack" aria-busy={query.refreshing}>
+    <div className="page-stack overview-layout" aria-busy={query.refreshing}>
       <RefreshStatus refreshing={query.refreshing} error={query.error} />
-      <section className="hero-panel">
+      <section className="hero-panel overview-hero">
         <div>
-          <p className="eyebrow">{data.range.label}</p>
-          <h1>Local activity intelligence</h1>
+          <p className="eyebrow"><span className="hero-kicker-line" />{data.range.label} · Your attention, at a glance</p>
+          <h1>A little clarity for your day.</h1>
           <p className="hero-copy">
-            Private analytics for understanding when your attention holds and
-            where your day changes shape.
+            See where your time goes. Make room for what matters.
           </p>
         </div>
         <div className="hero-meta">
-          <span>Latest sample</span>
+          <span className="hero-status"><i className="local-status-dot" />Latest activity</span>
           <strong>
             {data.latestSampleAt
               ? formatTimestamp(data.latestSampleAt, true)
@@ -512,7 +511,7 @@ export function OverviewPage({
         <Metric
           label="Tracked time"
           value={formatDuration(data.trackedMinutes)}
-          detail="Measured from completed activity intervals"
+          detail="Time spent in your active windows"
         />
         <Metric
           label="Productive time"
@@ -533,14 +532,14 @@ export function OverviewPage({
         <Metric
           label="Active streak"
           value={`${data.streakDays} ${data.streakDays === 1 ? "day" : "days"}`}
-          detail="Consecutive days with tracked activity"
+          detail="Consecutive days of activity"
         />
       </section>
 
       <section className="chart-panel panel rhythm-panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">Temporal pattern</p>
+            <p className="eyebrow">The shape of your day</p>
             <h2>Activity rhythm</h2>
             <p>Tracked minutes across the selected range.</p>
           </div>
@@ -764,10 +763,9 @@ export function InsightsPage({
       <section className="hero-panel insights-hero">
         <div>
           <p className="eyebrow">{data.range.label}</p>
-          <h1>Patterns, not judgments</h1>
+          <h1>Find your own rhythm.</h1>
           <p className="hero-copy">
-            Compare attention continuity, identify recurring hours, and see how
-            sustained work differs from total activity.
+            Notice when focus comes naturally, and how your days compare.
           </p>
         </div>
         <div className="hero-meta">

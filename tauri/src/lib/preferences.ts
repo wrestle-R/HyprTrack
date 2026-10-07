@@ -1,4 +1,5 @@
 import type { RangeKey } from "./types"
+import { isColorTheme, type ColorTheme } from "./themes"
 import {
   cloneDefaultKeybindings,
   type Keybinding,
@@ -19,8 +20,9 @@ export const FOCUS_THRESHOLD_OPTIONS: FocusThresholdMinutes[] = [
 ]
 
 export type DesktopPreferences = {
-  version: 3
+  version: 4
   theme: "system" | "light" | "dark"
+  colorTheme: ColorTheme
   defaultRange: RangeKey
   productiveTitles: string[]
   tableDensity: "compact" | "comfortable"
@@ -44,8 +46,9 @@ export const SIDEBAR_WIDTH_PIXELS: Record<SidebarWidthPreference, string> = {
 }
 
 export const DEFAULT_PREFERENCES: DesktopPreferences = {
-  version: 3,
+  version: 4,
   theme: "system",
+  colorTheme: "orange",
   defaultRange: "today",
   productiveTitles: ["VS Code", "GitHub"],
   tableDensity: "comfortable",
@@ -65,7 +68,7 @@ function parsePreferenceDocument(value: unknown): DesktopPreferences | null {
     version?: number
   }
   if (
-    ![1, 2, 3].includes(candidate.version ?? 0) ||
+    ![1, 2, 3, 4].includes(candidate.version ?? 0) ||
     !["system", "light", "dark"].includes(candidate.theme ?? "") ||
     !["today", "7d", "30d"].includes(candidate.defaultRange ?? "") ||
     !Array.isArray(candidate.productiveTitles) ||
@@ -80,11 +83,15 @@ function parsePreferenceDocument(value: unknown): DesktopPreferences | null {
   }
 
   return {
-    version: 3,
+    version: 4,
     theme: candidate.theme as DesktopPreferences["theme"],
+    colorTheme: isColorTheme(candidate.colorTheme) ? candidate.colorTheme : "orange",
     defaultRange:
       candidate.defaultRange as DesktopPreferences["defaultRange"],
-    productiveTitles: candidate.productiveTitles,
+    productiveTitles: [...new Set(candidate.productiveTitles.map((title) =>
+      ["com.microsoft.vscode", "code", "code-oss", "vscode", "visual studio code"].includes(title.trim().toLowerCase())
+        ? "VS Code" : title
+    ))],
     tableDensity:
       candidate.tableDensity as DesktopPreferences["tableDensity"],
     fontSize: candidate.fontSize ?? DEFAULT_PREFERENCES.fontSize,
@@ -95,12 +102,12 @@ function parsePreferenceDocument(value: unknown): DesktopPreferences | null {
       ? (candidate.focusThresholdMinutes as FocusThresholdMinutes)
       : DEFAULT_PREFERENCES.focusThresholdMinutes,
     mappingRules:
-      (candidate.version === 2 || candidate.version === 3) &&
+      (candidate.version ?? 0) >= 2 &&
       Array.isArray(candidate.mappingRules)
         ? candidate.mappingRules
         : cloneDefaultMappingRules(),
     keybindings:
-      (candidate.version === 2 || candidate.version === 3) &&
+      (candidate.version ?? 0) >= 2 &&
       Array.isArray(candidate.keybindings)
         ? candidate.keybindings
         : cloneDefaultKeybindings(),

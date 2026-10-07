@@ -42,4 +42,5 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: python3 -m unittest discover -s ../collector/tests
       - run: cargo test --manifest-path src-tauri/Cargo.toml
