@@ -11,7 +11,7 @@ on your machine.
 ## Website and documentation
 
 Explore the [HyprTrack website](https://hyprtrack-delta.vercel.app) for the
-feature showcase, six-theme playground, focus timer, and release downloads.
+feature showcase, app previews, and release downloads.
 The [handbook](https://hyprtrack-delta.vercel.app/docs) covers installation,
 the collector, appearance, mappings, shortcuts, safe updates, and your data.
 

@@ -27,7 +27,7 @@ npm test
 
 The browser suite starts its own production server on port 3817. It checks
 the handbook, mobile navigation, keyboard controls, nine viewport widths,
-copy buttons, all six palettes, appearance persistence, timer deadlines,
+copy buttons, appearance persistence,
 restricted storage, 404s, metadata routes, and WCAG accessibility rules.
 `PLAYWRIGHT_CHROMIUM_PATH` can select a system browser. Set
 `PLAYWRIGHT_BASE_URL` to check a deployed version instead of starting a local
@@ -59,14 +59,14 @@ new desktop release, and review the release page and corresponding docs.
 ## Design and assets
 
 The site uses an editorial time-journal design: warm paper, carbon ink,
-orange accents, an interactive day dial, real desktop screenshots, and a
-theme and focus playground. Design references and the original generation
+orange accents, an interactive day dial, and real desktop screenshots.
+Design references and the original generation
 prompts are in `design/`. See [design notes](design/DESIGN.md).
 
 Fonts are served locally with their OFL licenses in `public/fonts`. The
 desktop screenshots are the repository's sample-data screenshots, not
-personal activity. The browser playground uses illustrative data, and its
-timer is stored only in the current browser.
+personal activity. The day dial uses illustrative data, and the website
+appearance choice is stored only in the current browser.
 
 Official references: [Next.js App Router](https://nextjs.org/docs/app),
 [Vercel CLI deployments](https://vercel.com/docs/cli/deploy).

@@ -40,18 +40,6 @@ test("the day instrument responds to keyboard input",async({page}) => {
   await expect(page.locator(".dial-time")).toHaveText("11:01");
 });
 
-test("all six palettes and both preview modes respond",async({page}) => {
-  await page.goto("/");
-  for (const name of ["Sage","Ocean","Sand","Rose","Plum","Orange"]) {
-    await page.getByRole("radio",{name,exact:true}).check();
-    await expect(page.locator(".theme-demo")).toHaveAttribute("data-palette",name.toLowerCase());
-    await page.getByRole("button",{name:"Light",exact:true}).click();
-    await expect(page.locator(".theme-demo")).toHaveAttribute("data-mode","light");
-    await page.getByRole("button",{name:"Dark",exact:true}).click();
-    await expect(page.locator(".theme-demo")).toHaveAttribute("data-mode","dark");
-  }
-});
-
 test("website appearance persists and respects reduced motion",async({page}) => {
   await page.emulateMedia({reducedMotion:"reduce"});
   await page.goto("/");
@@ -80,44 +68,6 @@ test("screenshot tabs replace the image and work from the keyboard",async({page}
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("tab",{name:/Time to focus/})).toHaveAttribute("aria-selected","true");
   await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("alt",/Pomodoro/);
-});
-
-test("timer counts down, pauses, restores, completes, and resets",async({page}) => {
-  await page.clock.install({time:new Date("2026-10-07T12:00:00Z")});
-  await page.clock.pauseAt(new Date("2026-10-07T12:01:00Z"));
-  await page.goto("/");
-  await page.getByRole("button",{name:"Start a session"}).click();
-  await page.clock.fastForward(60_000);
-  await expect(page.getByRole("timer")).toHaveText("24:00");
-  await page.getByRole("button",{name:"Pause the session"}).click();
-  await page.clock.fastForward(60_000);
-  await expect(page.getByRole("timer")).toHaveText("24:00");
-  await page.reload();
-  await expect(page.getByRole("button",{name:"Resume the session"})).toBeVisible();
-  await expect(page.getByRole("timer")).toHaveText("24:00");
-  await page.getByRole("button",{name:"Resume the session"}).click();
-  await page.clock.fastForward(1_440_000);
-  await expect(page.getByRole("timer")).toHaveText("00:00");
-  await expect(page.getByText("Session complete. Take a moment for yourself.")).toBeVisible();
-  await page.getByRole("button",{name:"Short break",exact:true}).click();
-  await expect(page.getByRole("timer")).toHaveText("05:00");
-  await page.getByRole("button",{name:"Long break",exact:true}).click();
-  await expect(page.getByRole("timer")).toHaveText("15:00");
-  await page.getByRole("button",{name:"Reset timer"}).click();
-  await expect(page.getByRole("timer")).toHaveText("15:00");
-});
-
-test("timer retains its deadline across a running reload",async({page}) => {
-  await page.clock.install({time:new Date("2026-10-07T12:00:00Z")});
-  await page.clock.pauseAt(new Date("2026-10-07T12:01:00Z"));
-  await page.goto("/");
-  await page.getByRole("button",{name:"Start a session"}).click();
-  await expect(page.getByRole("button",{name:"Pause the session"})).toBeVisible();
-  await page.clock.fastForward(120_000);
-  await expect(page.getByRole("timer")).toHaveText("23:00");
-  await page.reload();
-  await expect(page.getByRole("timer")).toHaveText("23:00");
-  await expect(page.getByRole("button",{name:"Pause the session"})).toBeVisible();
 });
 
 test("docs search, mobile navigation, and adjacent chapters work",async({page},testInfo) => {
@@ -160,8 +110,6 @@ test("restricted browser storage does not break interactions",async({page}) => {
   await page.goto("/");
   await page.getByRole("button",{name:"Switch to dark mode"}).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
-  await page.getByRole("button",{name:"Start a session"}).click();
-  await expect(page.getByRole("button",{name:"Pause the session"})).toBeVisible();
 });
 
 test("unknown chapters return a useful 404 and metadata routes work",async({page,request}) => {
