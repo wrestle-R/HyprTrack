@@ -84,6 +84,7 @@ test("screenshot tabs replace the image and work from the keyboard",async({page}
 
 test("timer counts down, pauses, restores, completes, and resets",async({page}) => {
   await page.clock.install({time:new Date("2026-10-07T12:00:00Z")});
+  await page.clock.pauseAt(new Date("2026-10-07T12:01:00Z"));
   await page.goto("/");
   await page.getByRole("button",{name:"Start a session"}).click();
   await page.clock.fastForward(60_000);
@@ -108,6 +109,7 @@ test("timer counts down, pauses, restores, completes, and resets",async({page}) 
 
 test("timer retains its deadline across a running reload",async({page}) => {
   await page.clock.install({time:new Date("2026-10-07T12:00:00Z")});
+  await page.clock.pauseAt(new Date("2026-10-07T12:01:00Z"));
   await page.goto("/");
   await page.getByRole("button",{name:"Start a session"}).click();
   await expect(page.getByRole("button",{name:"Pause the session"})).toBeVisible();

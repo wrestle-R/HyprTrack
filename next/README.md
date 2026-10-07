@@ -40,8 +40,8 @@ The project's root-directory setting is `next`:
 
 ```sh
 cd ..
-vercel link --project hyprtrack
-vercel deploy --prod
+npx vercel link --project hyprtrack
+npx vercel deploy --prod
 ```
 
 The Git-connected Vercel project uses repository root directory `next` and
