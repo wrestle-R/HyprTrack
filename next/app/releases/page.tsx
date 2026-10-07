@@ -1,0 +1,14 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { DOWNLOAD, RELEASE, REPO, VERSION } from "@/lib/site";
+import { Arrow } from "@/components/icons";
+
+export const metadata:Metadata = {title:"Releases",description:"What’s new in HyprTrack Desktop. Download the latest release and keep your existing history.",alternates:{canonical:"/releases"}};
+
+export default function Releases() {
+  return <main id="main" className="releases shell"><p className="eyebrow">The changelog</p><h1>Still finding<br /><em>our rhythm.</em></h1><p className="releases-intro">Small improvements. A clearer picture.<br />Here’s what’s new in HyprTrack.</p>
+    <article className="release-entry"><div className="release-version"><strong>v{VERSION}</strong><span className="mono current">Current release</span><span className="mono">07 Oct 2026</span></div><div><h2>A clearer workspace,<br />a little time to focus.</h2><p>A full desktop refresh, the six MultiCodex palettes, and a compact Pomodoro timer. Your existing history and preferences stay with you.</p><ul><li>Calmer navigation, a compact metric strip, and cleaner charts and application tables.</li><li>Sage, Ocean, Sand, Rose, Plum, and Orange. Light, dark, or system appearance, with motion that respects your preferences.</li><li>15, 25, 45, and 60 minute focus blocks. Short and long breaks, pause and resume, daily counts, and an optional chime.</li><li>VS Code labels across current and historical activity, including <code>com.microsoft.VSCode</code>.</li><li>Mappings, keybindings, productive app choices, and the original SQLite activity database are retained.</li></ul><div className="hero-actions"><a className="button button-small" href={DOWNLOAD}>Download v{VERSION} <Arrow /></a><a className="text-link" href={RELEASE}>Release files <Arrow /></a><Link className="text-link" href="/docs/updating">Update safely <Arrow /></Link></div></div></article>
+    <article className="release-entry"><div className="release-version"><strong>v2.0.3</strong><span className="mono">Previous release</span></div><div><h2>Overview reads the day properly.</h2><p>Added the Top 5 applications panel beside focus quality, plus drill-downs from the 7-day and 30-day rhythm chart into each day’s top apps. Kept the existing local database and update flow intact.</p></div></article>
+    <article className="release-entry"><div className="release-version"><strong>v0.2.0</strong><span className="mono">From the archive</span></div><div><h2>The dashboard keeps growing.</h2><p>Default Notion and Instagram mappings, sturdier loading states, responsive layouts, and a safer upgrade guide that checks the collector database after replacement.</p><a href={`${REPO}/releases`} className="text-link" style={{marginTop:24}}>Browse every release <Arrow /></a></div></article>
+  </main>;
+}

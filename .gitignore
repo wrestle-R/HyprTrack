@@ -12,3 +12,8 @@
 /agents
 .superpowers
 docs/
+!next/app/docs/
+!next/app/docs/**
+.vercel/
+.env*
+!.env.example

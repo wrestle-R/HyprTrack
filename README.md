@@ -8,6 +8,23 @@ activity intervals to a local SQLite database.
 No account, web server, or network service is required. All activity data stays
 on your machine.
 
+## Website and documentation
+
+Explore the [HyprTrack website](https://hyprtrack-delta.vercel.app) for the
+feature showcase, six-theme playground, focus timer, and release downloads.
+The [handbook](https://hyprtrack-delta.vercel.app/docs) covers installation,
+the collector, appearance, mappings, shortcuts, safe updates, and your data.
+
+The public website is a separate Next.js project in [`next/`](next/README.md),
+hosted on Vercel. It uses sample data and never connects to your desktop
+activity database. For local development:
+
+```bash
+cd next
+npm ci
+npm run dev
+```
+
 ## Screenshots
 
 ### Light mode

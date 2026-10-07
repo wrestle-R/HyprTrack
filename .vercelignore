@@ -1,0 +1,11 @@
+*
+!next/
+!next/**
+next/node_modules/
+next/.next/
+next/.vercel/
+next/.env*
+next/design/
+next/test-results/
+next/playwright-report/
+next/*.tsbuildinfo
