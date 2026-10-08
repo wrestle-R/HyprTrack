@@ -30,6 +30,7 @@ test("responsive layouts keep the page and major text inside the viewport",async
 });
 
 test("the day instrument responds to keyboard input",async({page}) => {
+  await page.clock.install({time:new Date("2026-10-08T03:12:00Z")});
   await page.goto("/");
   const slider=page.getByRole("slider",{name:/Drag through a day/});
   await expect(page.locator(".dial-time")).toHaveText("08:42");
@@ -38,6 +39,10 @@ test("the day instrument responds to keyboard input",async({page}) => {
   await expect(page.locator(".dial-app")).toHaveText("Firefox");
   await slider.focus(); await page.keyboard.press("ArrowRight");
   await expect(page.locator(".dial-time")).toHaveText("11:01");
+  await page.clock.runFor(60_000);
+  await expect(page.locator(".dial-time")).toHaveText("11:01");
+  await page.getByRole("button",{name:"Back to now"}).click();
+  await expect(page.locator(".dial-time")).toHaveText("08:43");
 });
 
 test("website appearance persists and respects reduced motion",async({page}) => {
@@ -66,7 +71,8 @@ test("screenshot tabs show matching appearances and work from the keyboard",asyn
   await page.goto("/");
   await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("src",/light_screenshot/);
   await page.getByRole("tab",{name:/Make it yours/}).click();
-  await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("alt",/light overview/);
+  await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("alt",/light settings/);
+  await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("src",/settings_light_screenshot/);
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("tab",{name:/Time to focus/})).toHaveAttribute("aria-selected","true");
   await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("alt",/light Pomodoro/);
@@ -143,4 +149,43 @@ test("key pages and both appearances pass automated accessibility checks",async(
   await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
   const dark = await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze();
   expect(dark.violations.map(v => ({id:v.id,nodes:v.nodes.map(n => n.target)}))).toEqual([]);
+});
+
+
+test("the clock uses IST even outside India and rolls over at midnight",async({browser,baseURL}) => {
+  const context = await browser.newContext({baseURL,timezoneId:"America/New_York"});
+  const page = await context.newPage();
+  await page.clock.install({time:new Date("2026-10-08T18:29:59Z")});
+  await page.clock.pauseAt(new Date("2026-10-08T18:29:59Z"));
+  await page.goto("/");
+  await expect(page.locator(".dial-time")).toHaveText("23:59");
+  await expect(page.locator(".dial-zone")).toHaveText("IST · UTC+05:30");
+  await page.clock.runFor(1000);
+  await expect(page.locator(".dial-time")).toHaveText("00:00");
+  await context.close();
+});
+
+test("desktop hero and app preview fit inside a laptop screen",async({page},testInfo) => {
+  test.skip(testInfo.project.name !== "desktop");
+  for (const [width,height] of [[1024,640],[1280,720],[1366,768],[1440,900],[1920,1080]]) {
+    await page.setViewportSize({width,height});
+    await page.goto("/");
+    await page.evaluate(() => document.fonts.ready);
+    expect(await page.locator(".hero").evaluate(el => el.getBoundingClientRect().bottom),`hero at ${width}x${height}`).toBeLessThanOrEqual(height);
+    expect(await page.locator(".product-frame").evaluate(el => el.getBoundingClientRect().height),`preview at ${width}x${height}`).toBeLessThanOrEqual(height);
+  }
+});
+
+test("previews are loaded before switching tabs and reuse their images",async({page}) => {
+  await page.goto("/");
+  const images = page.locator(".product-image");
+  await expect(images).toHaveCount(6);
+  await expect.poll(() => images.evaluateAll(nodes => nodes.every(node => (node as HTMLImageElement).complete && (node as HTMLImageElement).naturalWidth > 0))).toBe(true);
+  const imageRequests:string[] = [];
+  page.on("request",request => { if (request.resourceType() === "image") imageRequests.push(request.url()); });
+  for (const title of ["Make it yours","Time to focus","The big picture"]) {
+    await page.getByRole("tab",{name:new RegExp(title)}).click();
+    await expect(page.getByRole("tabpanel").getByRole("img")).toBeVisible();
+  }
+  expect(imageRequests).toEqual([]);
 });

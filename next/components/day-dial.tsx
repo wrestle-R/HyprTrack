@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const segments = [
   { start: 0, end: 390, color: "var(--dial-empty)", app: "Away", kind: "Untracked time" },
@@ -23,8 +23,24 @@ function arc(start: number, end: number) {
   return `M${x1} ${y1} A210 210 0 ${end - start > 720 ? 1 : 0} 1 ${x2} ${y2}`;
 }
 
+const istClock = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
+function currentISTMinute() {
+  const parts = istClock.formatToParts(new Date());
+  return Number(parts.find(p => p.type === "hour")?.value) * 60 + Number(parts.find(p => p.type === "minute")?.value);
+}
+
 export function DayDial() {
-  const [minute, setMinute] = useState(522);
+  const [liveMinute, setLiveMinute] = useState<number | null>(null);
+  const [previewMinute, setPreviewMinute] = useState<number | null>(null);
+  useEffect(() => {
+    const update = () => setLiveMinute(currentISTMinute());
+    update();
+    const interval = window.setInterval(update, 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+  const minute = previewMinute ?? liveMinute ?? 0;
   const selected = segments.find(s => minute >= s.start && minute < s.end) ?? segments[0];
   const time = `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
   const [x, y] = point(minute, 194);
@@ -41,12 +57,12 @@ export function DayDial() {
         <g className="dial-pointer"><line x1="260" y1="260" x2={x} y2={y} stroke="currentColor" strokeOpacity=".65" /><circle cx={x} cy={y} r="6" fill="var(--accent)" stroke="var(--paper)" strokeWidth="3" /></g>
       </svg>
       <span className="dial-hour hour-0">00</span><span className="dial-hour hour-6">06</span><span className="dial-hour hour-12">12</span><span className="dial-hour hour-18">18</span>
-      <div className="dial-center"><span className="mono">A day in motion</span><span className="dial-time">{time}</span><span className="dial-app">{selected.app}</span><span className="dial-description">{selected.kind}</span></div>
+      <div className="dial-center"><span className="mono">A day in motion</span><span className="dial-time">{liveMinute === null && previewMinute === null ? "--:--" : time}</span><span className="dial-zone mono">IST · UTC+05:30</span><span className="dial-app">{selected.app}</span><span className="dial-description">{selected.kind}</span></div>
     </div>
     <div className="day-scrubber">
-      <div className="scrubber-caption"><label htmlFor="day-minute">Drag through a day <span>→</span></label><span className="mono">Illustrative data</span></div>
+      <div className="scrubber-caption"><label htmlFor="day-minute">Drag through a day <span>→</span></label><div className="scrubber-status">{previewMinute !== null && <button type="button" onClick={() => setPreviewMinute(null)}>Back to now</button>}<span className="mono">Illustrative data · IST</span></div></div>
       <div className="scrubber-track"><div className="time-rail" aria-hidden="true">{segments.map(s => <span key={s.start} style={{ width: `${(s.end - s.start) / 14.4}%`, background: s.color }} />)}</div>
-      <input id="day-minute" type="range" min="0" max="1439" value={minute} onChange={e => setMinute(Number(e.target.value))} aria-valuetext={`${time}, ${selected.app}, ${selected.kind}`} /></div>
+      <input id="day-minute" type="range" min="0" max="1439" value={minute} onChange={e => setPreviewMinute(Number(e.target.value))} aria-valuetext={`${time} IST, ${selected.app}, ${selected.kind}`} /></div>
       <div className="rail-labels mono"><span>00:00</span><span>12:00</span><span>24:00</span></div>
     </div>
   </div>;

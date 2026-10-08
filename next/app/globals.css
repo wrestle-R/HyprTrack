@@ -95,6 +95,7 @@
   .dial-center { position: absolute; inset: 28% 18%; display: flex; align-items: center; justify-content: center; flex-direction: column; background: var(--paper); border-radius: 50%; }
   .dial-center > .mono { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; }
   .dial-time { font: 600 clamp(50px,5.6vw,86px)/1.1 var(--font-display); letter-spacing: -.04em; font-variant-numeric: tabular-nums; margin: 10px 0 6px; }
+  .dial-zone { color: var(--subtle); font-size: 9px; margin-bottom: 10px; }
   .dial-app { font-size: 16px; font-weight: 500; }
   .dial-description { color: var(--subtle); font-size: 12px; margin-top: 2px; }
   .dial-hour { position: absolute; font: 11px/1 ui-monospace, monospace; color: var(--subtle); }
@@ -105,6 +106,8 @@
   .day-scrubber { position: relative; margin-top: 28px; }
   .scrubber-caption { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; font-size: 12px; }
   .scrubber-caption label span { color: var(--accent); margin-left: 8px; }
+  .scrubber-status { display: flex; align-items: center; gap: 12px; }
+  .scrubber-status button { background: none; border: 0; border-bottom: 1px solid currentColor; padding: 0; color: var(--accent); font-size: 11px; }
   .scrubber-caption .mono { font-size: 9px; color: var(--subtle); letter-spacing: .025em; }
   .time-rail { height: 17px; display: flex; position: relative; overflow: hidden; }
   .time-rail > span { border-right: 1px solid var(--paper); }
@@ -136,7 +139,7 @@
   :root[data-theme="dark"] .theme-preview-light { display: none; }
   :root[data-theme="dark"] .theme-preview-dark { display: inline; }
   :root[data-theme="dark"] .product-image.theme-preview-dark { display: block; }
-  .product-image { width: 100%; height: auto; animation: preview-in .25s ease; }
+  .product-image { width: 100%; height: auto; }
   @keyframes preview-in { from { opacity: .45; } to { opacity: 1; } }
   .product-caption { display: flex; align-items: center; justify-content: space-between; padding: 10px 15px; gap: 16px; border-top: 1px solid var(--rule); color: var(--subtle); font-size: 10px; }
   .product-caption .mono { font-size: 9px; }
@@ -542,4 +545,19 @@
     .install-copy h2 { font-size: 9.5vw; }
     .code-header .mono { font-size: 7px; }
   }
+  @media (min-width: 901px) {
+    .hero { padding-top: clamp(20px, 4svh, 48px); }
+    .hero-copy { padding-top: 12px; }
+    .hero h1 { font-size: clamp(64px, min(8vw, 16svh), 120px); }
+    .hero .eyebrow { margin-bottom: 18px; }
+    .hero-description { margin-top: 20px; font-size: 18px; }
+    .hero .hero-actions { margin-top: 22px; }
+    .hero-platform { margin-top: 14px; }
+    .day-dial { max-width: min(440px, calc(100svh - 360px)); }
+    .dial-time { font-size: clamp(48px, 9svh, 76px); }
+    .day-scrubber { margin-top: 20px; }
+    .principles { margin-top: 24px; padding-block: 18px; }
+    .product-image { max-height: calc(100svh - 140px); object-fit: contain; }
+  }
+
 }
