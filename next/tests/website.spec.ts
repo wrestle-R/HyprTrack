@@ -61,13 +61,26 @@ test("appearance fades when view transitions are unavailable",async({page}) => {
   await expect(page.locator("html")).toHaveAttribute("data-theme","light");
 });
 
-test("screenshot tabs replace the image and work from the keyboard",async({page}) => {
+test("screenshot tabs show matching appearances and work from the keyboard",async({page}) => {
+  await page.emulateMedia({reducedMotion:"reduce"});
   await page.goto("/");
-  await page.getByRole("tab",{name:/A lighter view/}).click();
+  await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("src",/light_screenshot/);
+  await page.getByRole("tab",{name:/Make it yours/}).click();
   await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("alt",/light overview/);
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("tab",{name:/Time to focus/})).toHaveAttribute("aria-selected","true");
-  await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("alt",/Pomodoro/);
+  await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("alt",/light Pomodoro/);
+  await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("src",/pomodoro_light_screenshot/);
+  await page.getByRole("button",{name:"Switch to dark mode"}).click();
+  await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("alt",/dark Pomodoro/);
+  await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("src",/pomodoro_screenshot/);
+  await expect(page.locator(".product-caption .theme-preview-dark")).toBeVisible();
+  await page.getByRole("tab",{name:/The big picture/}).click();
+  await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("src",/dark_screenshot/);
+  await page.reload();
+  await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("src",/dark_screenshot/);
+  await page.getByRole("button",{name:"Switch to light mode"}).click();
+  await expect(page.getByRole("tabpanel").getByRole("img")).toHaveAttribute("src",/light_screenshot/);
 });
 
 test("docs search, mobile navigation, and adjacent chapters work",async({page},testInfo) => {

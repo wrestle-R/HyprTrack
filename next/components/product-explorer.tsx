@@ -7,11 +7,12 @@ import { Arrow } from "./icons";
 import dark from "@/public/images/dark_screenshot.png";
 import light from "@/public/images/light_screenshot.png";
 import focus from "@/public/images/pomodoro_screenshot.png";
+import lightFocus from "@/public/images/pomodoro_light_screenshot.png";
 
 const views = [
-  { title: "The big picture", image: dark, caption: "Overview · dark mode", description: "Tracked time, productive time, your top applications, and the rhythm of your day. All in one calm workspace.", alt: "HyprTrack dark overview with tracked time, focus quality, activity rhythm and VS Code usage" },
-  { title: "A lighter view", image: light, caption: "Overview · light mode", description: "The same clear picture in daylight. Resize the workspace, adjust the typography, and find a layout that feels right.", alt: "HyprTrack light overview showing the activity chart and top applications" },
-  { title: "Time to focus", image: focus, caption: "Pomodoro · desktop timer", description: "A compact timer that stays with you across pages. Choose a focus block, take a break, and pick up where you left off.", alt: "HyprTrack with the compact Pomodoro controls open" },
+  { title: "The big picture", lightImage: light, darkImage: dark, caption: "Overview", description: "Tracked time, productive time, your top applications, and the rhythm of your day. All in one calm workspace.", alt: "overview with tracked time, focus quality, activity rhythm and VS Code usage" },
+  { title: "Make it yours", lightImage: light, darkImage: dark, caption: "Workspace", description: "The same clear picture in your preferred appearance. Resize the workspace, adjust the typography, and find a layout that feels right.", alt: "overview showing the activity chart and top applications" },
+  { title: "Time to focus", lightImage: lightFocus, darkImage: focus, caption: "Pomodoro", description: "A compact timer that stays with you across pages. Choose a focus block, take a break, and pick up where you left off.", alt: "Pomodoro with the compact desktop timer controls open" },
 ];
 
 export function ProductExplorer() {
@@ -27,8 +28,8 @@ export function ProductExplorer() {
   return <div className="product-explorer">
     <div className="product-frame" id="product-panel" role="tabpanel" aria-labelledby={`product-tab-${index}`}>
       <div className="product-chrome"><span><i /><i /><i /></span><span className="mono">HyprTrack Desktop / v2.1.0</span><span className="window-mark">↗</span></div>
-      <Image key={index} src={views[index].image} alt={views[index].alt} sizes="(max-width: 900px) 95vw, 76vw" placeholder="blur" className="product-image" />
-      <div className="product-caption"><span className="mono">{views[index].caption}</span><span>App screenshot · sample data</span></div>
+      {(["light", "dark"] as const).map(mode => <Image key={`${index}-${mode}`} src={mode === "light" ? views[index].lightImage : views[index].darkImage} alt={`HyprTrack ${mode} ${views[index].alt}`} sizes="(max-width: 900px) 95vw, 76vw" placeholder="blur" className={`product-image theme-preview-${mode}`} />)}
+      <div className="product-caption"><span className="mono">{views[index].caption} · <span className="theme-preview-light">light mode</span><span className="theme-preview-dark">dark mode</span></span><span>App screenshot · sample data</span></div>
     </div>
     <div className="product-selector">
       <div role="tablist" aria-label="App previews" aria-orientation={orientation} onKeyDown={e => {
