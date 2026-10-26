@@ -52,13 +52,13 @@ is not uploaded anywhere.
 
 ## Install On Arch Linux
 
-The current release is `v2.1.0`. Download the AppImage into a permanent
+The current release is `v2.2.0`. Download the AppImage into a permanent
 location:
 
 ```bash
 mkdir -p ~/.local/bin
 wget -O ~/.local/bin/hyprtrack-desktop.AppImage \
-  https://github.com/wrestle-R/HyprTrack/releases/download/v2.1.0/HyprTrack.Desktop_2.1.0_amd64.AppImage
+  https://github.com/wrestle-R/HyprTrack/releases/download/v2.2.0/HyprTrack.Desktop_2.2.0_amd64.AppImage
 chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
 ```
@@ -91,14 +91,14 @@ script. It does not replace or delete the existing activity database at:
 
 Create a SQLite-safe backup first, then replace the AppImage. The commands
 below also record the pre-update row count and integrity result so you can
-confirm the same database is still healthy after the first `2.1.0` launch.
+confirm the same database is still healthy after the first `2.2.0` launch.
 Change
 `VERSION` to the release you want to install:
 
 ### Update From A Published Release
 
 ```bash
-VERSION=2.1.0
+VERSION=2.2.0
 mkdir -p ~/.local/share/hyprtrack-backups
 database="$HOME/.local/bin/hyprtrack/collector/hyprtrack.db"
 backup="$HOME/.local/share/hyprtrack-backups/hyprtrack-$(date +%Y%m%d-%H%M%S).db"
@@ -167,7 +167,121 @@ Shortcuts work only while the HyprTrack window is focused. Super/Meta shortcuts
 are intentionally unsupported so HyprTrack does not conflict with Hyprland
 global bindings.
 
+## App version, updates and release notes
+
+Settings shows the installed app version and **Check for updates**. AppImage
+installations check on startup, when the app regains focus/reconnects, and every
+10 minutes while visible. When a newer release is available, **Update to v…**
+appears in the header; **Install & restart** is also available in Settings.
+The updater downloads and verifies a signed AppImage before installing it.
+The application database and preferences stay in place, and the independent
+collector keeps recording during an app-only update. Updating a running Python
+collector still requires restarting its existing command once to load new code.
+
+**What’s New** in the sidebar keeps the release history available offline.
+DEB/RPM installations show the version and release notes but use their package
+manager for updates. Updating from 2.1.0 to 2.2.0 uses the existing manual update
+instructions once; subsequent AppImage releases support the in-app updater.
+
+Release builds use `TAURI_SIGNING_PRIVATE_KEY` and the public key in
+`tauri.conf.json`. The AppImage is signed again after the Linux wrapper is
+patched; `latest.json` references those final signed bytes. Keep the private
+signing key outside the repository and provide it to CI as a repository secret.
+
+## Dataflow: internet usage
+
+The desktop's **Dataflow** tab shows received and sent data, a download/upload
+graph, and rankings for applications and system services. Browsers are counted
+as applications: every Zen tab belongs to Zen, for example. Existing screen-time
+browser-title tracking, mappings, checkpoints, and focus handling stay the same.
+Overview has a small internet summary; detailed network analytics live in Dataflow.
+
+Both collectors start through the **same existing command and Hyprland autostart
+entry**, `hyprtrack-monitor.py`. Its network module runs independently so missing
+capture permissions, network changes, or capture errors do not stop screen time.
+Closing the desktop window does not stop either collector. Collection runs with
+the desktop session; it does not collect traffic while the collector is stopped.
+The `--once` command still records just one screen-time sample.
+
+Network capture uses the separately installed **NetHogs** native executable,
+with TCP and UDP enabled (including IPv4/IPv6 traffic). HyprTrack does not bundle
+NetHogs or run Python/the dashboard as root. Launch the updated desktop once to
+export the companion module, schema and setup script, then run this setup explicitly:
+
+```bash
+sudo pacman -S --needed nethogs
+sudo bash ~/.local/bin/hyprtrack/collector/setup-network.sh "$(id -un)"
+```
+
+The setup installs an administrator-owned capture copy at
+`/usr/local/libexec/hyprtrack/nethogs`, executable by your primary group, with
+NetHogs' documented network/process-inspection capabilities. This allows
+machine-wide process accounting, including system services and other users'
+processes. Re-run setup after a NetHogs package update to refresh that private
+copy. Stop your existing collector and start its usual command once after a
+HyprTrack update to load the new module. Do not start a second collector against
+the same database. No real `.env` file or online service is needed.
+
+Dataflow displays setup/offline/stale states instead of sample usage. It counts
+TCP/UDP traffic on active physical interfaces; loopback, VPN, bridge and virtual
+interfaces are excluded to avoid counting extra interface copies. LAN transfers
+on physical interfaces are included. NetHogs attribution and displayed cumulative
+byte counters are approximate, particularly for short-lived/shared sockets,
+process reuse and high traffic volumes. Unresolved ownership stays in
+**Unattributed** and is included in totals. Historical unknown bytes that later
+gain an owner stay unknown instead of being counted twice. Totals may differ
+from file sizes or a provider's billing meter. Network changes automatically
+restart capture; the reconnection window is unobserved. Captured packet contents,
+connection addresses, domains and process command lines are never persisted.
+
+### Thirty-day detail, permanent daily summaries
+
+The collector retains **30 complete IST days plus the current day** of detailed
+network and screen-time records. Older detail is automatically compacted into
+daily per-application summaries in the same SQLite database. Summary writes and
+detail deletion share a transaction; a failure rolls the transaction back. Open,
+malformed, or cutoff-spanning screen-time intervals are preserved until they can
+be safely compacted. Work is batched to limit database lock time.
+
+Daily app totals stay indefinitely. Dataflow's **Explore all history** includes
+archived internet summaries; the existing Today/7-day/30-day screen-time views
+retain their detail. Screen-time streaks also include archived days. Once a
+previous comparison period contains archived sessions, Insights says **Previous
+detail archived** rather than calculating an inaccurate partial baseline. Exact
+old website titles, session timing, and session-based focus comparisons cannot
+be reconstructed from app summaries.
+
+SQLite reuses pages freed by compaction, so its file may not immediately shrink.
+No blocking full-database vacuum runs during collection. Backups are still
+manual; create a SQLite-safe backup before updating. Raw row counts can decrease
+after collector maintenance because records have moved into summaries, which is
+expected and does not mean their app totals were lost.
+
+For inspection:
+
+```sql
+SELECT day, app_name, scope, rx_bytes, tx_bytes FROM network_daily_summaries;
+SELECT day, app_class, seconds FROM activity_daily_summaries;
+```
+
+To remove only the separately installed capture tool, stop the collector and run
+`sudo rm /usr/local/libexec/hyprtrack/nethogs`. This leaves history in SQLite.
+Starting the collector again continues screen-time tracking and shows network
+setup as required.
+
 ## Version History
+
+### v2.2.0 — Every byte has a place now
+
+Adds Dataflow for per-app downloads/uploads, a small internet summary in the
+Overview metric strip, and moves Focus quality into Insights. Both collectors
+start through the existing Python command. Older detailed records compact into
+permanent daily app summaries after 30 complete IST days.
+
+Adds signed AppImage updates with startup/reconnect checks, an in-app install
+button, version information in Settings, and an offline What’s New page.
+Existing usage databases and preferences stay in place during app updates.
+The native NetHogs capture setup is still required to enable live network data.
 
 ### v2.1.0 — A clearer workspace, a little time to focus
 

@@ -17,3 +17,5 @@ docs/
 .vercel/
 .env*
 !.env.example
+
+/local-docs/

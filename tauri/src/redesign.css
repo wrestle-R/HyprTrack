@@ -82,6 +82,14 @@ button:disabled { cursor: not-allowed; }
 .chart-summary span { font-size: .62rem; }
 .chart-summary strong { display: block; font-size: .95rem; margin-top: .15rem; }
 .overview-insight-grid { grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 1.1rem; }
+.overview-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.overview-network-summary { cursor: pointer; color: var(--foreground); text-align: left; font: inherit; min-width: 0; }
+.overview-network-summary:hover { background: var(--sidebar-accent); }
+.overview-network-summary .metric-label > span { color: var(--primary); margin-left: .3rem; }
+@media (min-width: 901px) and (max-width: 1350px) { .metrics-grid.overview-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); } .overview-metrics > .metric-card { padding: 1.1rem .85rem; } }
+@media (max-width: 900px) { .overview-metrics > .metric-card:nth-child(-n+4) { border-bottom: 1px solid var(--border); } .overview-metrics > .metric-card:nth-child(2n) { border-right: 0; } .overview-metrics > .overview-network-summary { grid-column: 1 / -1; } }
+.insights-focus-grid { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 1.1rem; align-items: stretch; }
+@media (max-width: 1000px) { .insights-focus-grid { grid-template-columns: minmax(0, 1fr); } }
 .focus-score { border: 1px solid color-mix(in oklab, var(--primary) 22%, var(--border)); background: color-mix(in oklab, var(--primary) 6%, var(--card)); border-radius: .7rem; padding: .5rem .7rem; }
 .focus-score strong { color: var(--primary); font-size: 1.5rem; letter-spacing: -.05em; }
 .focus-score span { font-size: .6rem; }
@@ -196,7 +204,7 @@ button:disabled { cursor: not-allowed; }
   .overview-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: stretch; }
   .overview-layout > .hero-panel, .overview-layout > .metrics-grid, .overview-layout > .data-refresh-status { grid-column: 1 / -1; }
   .overview-layout .overview-insight-grid { display: contents; }
-  .overview-layout .rhythm-panel { grid-column: 1; }
+  .overview-layout .rhythm-panel { grid-column: 1 / -1; }
   .overview-layout .focus-quality-card { grid-column: 2; }
   .overview-layout .top-applications-panel { grid-column: 1 / -1; min-height: auto; }
   .overview-layout .top-app-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1rem; }

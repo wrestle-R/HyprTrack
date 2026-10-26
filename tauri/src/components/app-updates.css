@@ -1,0 +1,21 @@
+.app-update-control { position: relative; }
+.app-update-popover { position: absolute; right: 0; top: calc(100% + .8rem); width: min(22rem, calc(100vw - 2rem)); padding: 1.1rem; background: var(--card); color: var(--foreground); border: 1px solid var(--border); border-radius: .8rem; box-shadow: var(--shadow); z-index: 50; }
+.app-update-popover p, .app-update-settings p { color: var(--muted-foreground); font-size: .78rem; line-height: 1.7; }
+.app-update-popover strong, .app-update-status strong { font-size: .8rem; }
+.app-update-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+.app-version-line { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }
+.app-version-line > strong { font-family: "Bricolage Grotesque", sans-serif; font-size: 1.15rem; letter-spacing: -.025em; }
+.app-update-status { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.app-update-track { margin-top: .8rem; height: .3rem; background: var(--muted); border-radius: .2rem; overflow: hidden; }
+.app-update-track span { display: block; height: 100%; background: var(--primary); transition: width 150ms ease; }
+.app-update-track.indeterminate span { animation: update-slide 1.2s ease-in-out infinite alternate; }
+@keyframes update-slide { from { transform: translateX(0); } to { transform: translateX(180%); } }
+.release-entry { max-width: 68rem; padding: 1.7rem 2rem; }
+.release-entry-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .8rem; font-size: .7rem; color: var(--muted-foreground); }
+.release-entry-meta > span:last-child:not(.pill) { margin-left: auto; color: var(--primary); }
+.release-entry h2 { font-family: "Bricolage Grotesque", sans-serif; font-size: clamp(1.3rem, 2vw, 1.75rem); letter-spacing: -.035em; font-weight: 500; margin: 1.2rem 0 .9rem; }
+.release-entry ul { display: grid; gap: .75rem; color: var(--muted-foreground); font-size: .85rem; line-height: 1.8; padding-left: 1.2rem; }
+.release-entry li::marker { color: var(--primary); }
+.release-notes-footnote { font-size: .75rem; color: var(--muted-foreground); }
+@media (max-width: 650px) { .release-entry { padding: 1.2rem; } }
+@media (prefers-reduced-motion: reduce) { .app-update-track.indeterminate span { animation: none; } }

@@ -9,6 +9,11 @@ import type {
   RangeKey,
 } from "./types"
 import type { MappingRule } from "./mappings"
+import type { NetworkData } from "./network"
+
+export function getNetwork(range: RangeKey | "all") {
+  return invoke<NetworkData>("get_network", { range })
+}
 
 export function getOverview(
   range: RangeKey,

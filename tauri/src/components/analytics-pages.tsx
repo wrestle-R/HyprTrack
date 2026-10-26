@@ -16,7 +16,6 @@ import {
 import { useDesktopQuery } from "../hooks/use-desktop-query"
 import { getInsights, getOverview } from "../lib/desktop-api"
 import {
-  calculateProductiveMinutes,
   formatDuration,
   formatTimestamp,
 } from "../lib/format"
@@ -24,6 +23,7 @@ import type { MappingRule } from "../lib/mappings"
 import type {
   ApplicationUsage,
   ComparisonValue,
+  FocusQuality,
   DailyInsightPoint,
   InsightsData,
   OverviewData,
@@ -31,6 +31,7 @@ import type {
   TimelinePoint,
 } from "../lib/types"
 import { DataPageSkeleton, RefreshStatus } from "./data-loading"
+import { NetworkSummary } from "./network-summary"
 
 type AnalyticsPageProps = {
   range: RangeKey
@@ -172,11 +173,11 @@ function ComparisonCard({
           favorable === null ? "neutral" : favorable ? "positive" : "negative"
         }`}
       >
-        {change === null
+        {comparison.detailArchived ? "Previous detail archived" : change === null
           ? "No prior baseline"
           : `${change > 0 ? "+" : ""}${Math.round(change)}% vs previous`}
       </div>
-      <small>Previous: {formatValue(comparison.previous)}</small>
+      <small>{comparison.detailArchived ? "Daily app totals retained" : `Previous: ${formatValue(comparison.previous)}`}</small>
     </div>
   )
 }
@@ -428,13 +429,54 @@ export function RhythmRail({ cells }: { cells: InsightsData["rhythm"] }) {
   )
 }
 
+function FocusQualityPanel({ quality, focusThresholdMinutes }: { quality: FocusQuality; focusThresholdMinutes: number }) {
+  return (
+    <section className="panel focus-quality-panel focus-quality-card">
+      <div className="panel-header compact">
+        <div>
+          <p className="eyebrow">Attention continuity</p>
+          <h2>Focus quality</h2>
+          <p>
+            Sessions over {focusThresholdMinutes} minutes count as focused.
+          </p>
+        </div>
+        <div className="focus-score">
+          <strong>{Math.round(quality.continuityPercent)}%</strong>
+          <span>continuity</span>
+        </div>
+      </div>
+      <div className="focus-stack">
+        <Metric
+          label="Focused time"
+          value={formatDuration(quality.focusedMinutes)}
+          detail="Inside qualifying focus blocks"
+        />
+        <Metric
+          label="Longest block"
+          value={formatDuration(
+            quality.longestFocusedBlockMinutes
+          )}
+          detail="Best uninterrupted session"
+        />
+        <Metric
+          label="Context switches"
+          value={String(quality.contextSwitches)}
+          detail={`${quality.switchesPerTrackedHour.toFixed(
+            1
+          )} per tracked hour`}
+        />
+      </div>
+    </section>
+  )
+}
+
 export function OverviewPage({
   range,
   refreshVersion,
-  productiveTitles,
+  onOpenDataflow,
   focusThresholdMinutes,
   mappingRules,
-}: AnalyticsPageProps & { productiveTitles: string[] }) {
+}: AnalyticsPageProps & { onOpenDataflow: () => void }) {
   const scopeKey = JSON.stringify([
     range,
     focusThresholdMinutes,
@@ -475,10 +517,6 @@ export function OverviewPage({
   }
 
   const data = query.data
-  const productiveMinutes = calculateProductiveMinutes(
-    data.applications,
-    productiveTitles
-  )
   const average = data.averageTrackedMinutes
   const peak = data.timeline.reduce<TimelinePoint | null>(
     (current, point) =>
@@ -491,10 +529,10 @@ export function OverviewPage({
       <RefreshStatus refreshing={query.refreshing} error={query.error} />
       <section className="hero-panel overview-hero">
         <div>
-          <p className="eyebrow"><span className="hero-kicker-line" />{data.range.label} · Your attention, at a glance</p>
+          <p className="eyebrow"><span className="hero-kicker-line" />{data.range.label} · Your activity, at a glance</p>
           <h1>A little clarity for your day.</h1>
           <p className="hero-copy">
-            See where your time goes. Make room for what matters.
+            Your active hours, most-used apps, and the rhythm of your day.
           </p>
         </div>
         <div className="hero-meta">
@@ -507,18 +545,16 @@ export function OverviewPage({
         </div>
       </section>
 
-      <section className="metrics-grid">
+      <section className="metrics-grid overview-metrics">
         <Metric
           label="Tracked time"
           value={formatDuration(data.trackedMinutes)}
           detail="Time spent in your active windows"
         />
         <Metric
-          label="Productive time"
-          value={formatDuration(productiveMinutes)}
-          detail={`${Math.round(
-            (productiveMinutes / data.trackedMinutes) * 100
-          )}% of tracked time`}
+          label={range === "today" ? "Average tracked/hour" : "Average tracked/day"}
+          value={formatDuration(average)}
+          detail={range === "today" ? "Across elapsed hours today" : "Across days with recorded activity"}
         />
         <Metric
           label="Top application"
@@ -534,6 +570,7 @@ export function OverviewPage({
           value={`${data.streakDays} ${data.streakDays === 1 ? "day" : "days"}`}
           detail="Consecutive days of activity"
         />
+        <NetworkSummary range={range} refreshVersion={refreshVersion} onOpen={onOpenDataflow} />
       </section>
 
       <section className="chart-panel panel rhythm-panel">
@@ -670,43 +707,6 @@ export function OverviewPage({
       </section>
 
       <div className="overview-insight-grid">
-        <section className="panel focus-quality-panel focus-quality-card">
-          <div className="panel-header compact">
-            <div>
-              <p className="eyebrow">Attention continuity</p>
-              <h2>Focus quality</h2>
-              <p>
-                Sessions over {focusThresholdMinutes} minutes count as focused.
-              </p>
-            </div>
-            <div className="focus-score">
-              <strong>{Math.round(data.focusQuality.continuityPercent)}%</strong>
-              <span>continuity</span>
-            </div>
-          </div>
-          <div className="focus-stack">
-            <Metric
-              label="Focused time"
-              value={formatDuration(data.focusQuality.focusedMinutes)}
-              detail="Inside qualifying focus blocks"
-            />
-            <Metric
-              label="Longest block"
-              value={formatDuration(
-                data.focusQuality.longestFocusedBlockMinutes
-              )}
-              detail="Best uninterrupted session"
-            />
-            <Metric
-              label="Context switches"
-              value={String(data.focusQuality.contextSwitches)}
-              detail={`${data.focusQuality.switchesPerTrackedHour.toFixed(
-                1
-              )} per tracked hour`}
-            />
-          </div>
-        </section>
-
         <TimelineTopApplicationsPanel
           applications={data.applications}
           timeline={data.timeline}
@@ -798,16 +798,19 @@ export function InsightsPage({
         />
       </section>
 
-      <section className="panel heatmap-panel">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Recurring windows</p>
-            <h2>Weekly rhythm</h2>
-            <p>Taller, warmer segments contain more tracked time.</p>
+      <div className="insights-focus-grid">
+        <FocusQualityPanel quality={data.focusQuality} focusThresholdMinutes={focusThresholdMinutes} />
+        <section className="panel heatmap-panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Recurring windows</p>
+              <h2>Weekly rhythm</h2>
+              <p>Taller, warmer segments contain more tracked time.</p>
+            </div>
           </div>
-        </div>
-        <RhythmRail cells={data.rhythm} />
-      </section>
+          <RhythmRail cells={data.rhythm} />
+        </section>
+      </div>
 
       <section className="panel trend-panel">
         <div className="panel-header">

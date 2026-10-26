@@ -1,7 +1,7 @@
 {
   "name": "hyprtrack-desktop",
   "private": true,
-  "version": "2.1.0",
+  "version": "2.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:release": "bash scripts/test-release-packaging.sh",
-    "release:linux": "bash scripts/build-linux-release.sh"
+    "release:linux": "bash scripts/build-linux-release.sh",
+    "test:updater": "node --test scripts/updater-manifest.check.mjs"
   },
   "dependencies": {
     "@fontsource/bricolage-grotesque": "^5.2.10",

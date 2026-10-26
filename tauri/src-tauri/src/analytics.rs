@@ -283,6 +283,7 @@ pub struct ComparisonValue {
     pub current: f64,
     pub previous: f64,
     pub percent_change: Option<f64>,
+    pub detail_archived: bool,
 }
 
 #[derive(Clone, Serialize)]
@@ -331,6 +332,7 @@ pub struct InsightsData {
     pub rhythm: Vec<RhythmCell>,
     pub daily_trend: Vec<DailyInsightPoint>,
     pub highlights: InsightHighlights,
+    pub focus_quality: FocusQuality,
 }
 
 #[derive(Clone, Serialize)]
@@ -418,6 +420,12 @@ fn open_database(database_path: &str) -> Result<Connection, String> {
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )
     .map_err(|error| error.to_string())?;
+    connection
+        .busy_timeout(std::time::Duration::from_secs(3))
+        .map_err(|error| error.to_string())?;
+    connection
+        .execute_batch("BEGIN DEFERRED")
+        .map_err(|error| error.to_string())?;
 
     let mut statement = connection
         .prepare("PRAGMA table_info(activity_samples)")
@@ -726,6 +734,7 @@ fn calculate_focus_quality(
 
 fn comparison_value(current: f64, previous: f64) -> ComparisonValue {
     ComparisonValue {
+        detail_archived: false,
         current: round_minutes(current),
         previous: round_minutes(previous),
         percent_change: if previous == 0.0 {
@@ -1246,6 +1255,30 @@ fn calculate_streak(connection: &Connection, end: &DateTime<FixedOffset>) -> Res
         .iter()
         .map(|value| parse_time(value).map(|dt| dt.date_naive()))
         .collect::<Result<Vec<_>, _>>()?;
+    let has_archive: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='activity_daily_summaries')",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|error| error.to_string())?;
+    if has_archive {
+        let mut statement = connection
+            .prepare("SELECT DISTINCT day FROM activity_daily_summaries WHERE day<=? AND seconds>0")
+            .map_err(|error| error.to_string())?;
+        let archived = statement
+            .query_map([end.format("%Y-%m-%d").to_string()], |row| {
+                row.get::<_, String>(0)
+            })
+            .map_err(|error| error.to_string())?;
+        for day in archived {
+            let day = day.map_err(|error| error.to_string())?;
+            days.push(
+                chrono::NaiveDate::parse_from_str(&day, "%Y-%m-%d")
+                    .map_err(|error| error.to_string())?,
+            );
+        }
+    }
     days.sort();
     days.dedup();
     if days.is_empty() {
@@ -1326,7 +1359,7 @@ pub fn read_insights(
     let daily_trend = build_focus_trend(&samples, &sessions, &range, focus_threshold_minutes);
     let highlights = build_highlights(&rhythm, &daily_trend, &sessions, &quality);
 
-    Ok(InsightsData {
+    let mut data = InsightsData {
         range: range_payload(&range),
         comparisons: InsightComparisons {
             tracked_minutes: comparison_value(tracked_minutes, previous_tracked_minutes),
@@ -1358,7 +1391,42 @@ pub fn read_insights(
         rhythm,
         daily_trend,
         highlights,
-    })
+        focus_quality: quality,
+    };
+    let has_archive: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='activity_daily_summaries')",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|error| error.to_string())?;
+    if has_archive {
+        let overlaps: bool = connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM activity_daily_summaries WHERE day>=?1 AND day<=?2)",
+                [
+                    previous.start.format("%Y-%m-%d").to_string(),
+                    previous.end.format("%Y-%m-%d").to_string(),
+                ],
+                |row| row.get(0),
+            )
+            .map_err(|error| error.to_string())?;
+        if overlaps {
+            // Daily app totals cannot recreate exact sessions or a partial-day
+            // comparison. Show unavailable instead of a misleading partial baseline.
+            for value in [
+                &mut data.comparisons.tracked_minutes,
+                &mut data.comparisons.average_tracked_minutes_per_active_day,
+                &mut data.comparisons.focus_continuity,
+                &mut data.comparisons.average_session_minutes,
+                &mut data.comparisons.switches_per_tracked_hour,
+            ] {
+                value.detail_archived = true;
+                value.percent_change = None;
+            }
+        }
+    }
+    Ok(data)
 }
 
 pub fn read_activity(
@@ -1784,6 +1852,40 @@ mod tests {
             ),
             ("zen".to_string(), "Dotfiles".to_string()),
         );
+    }
+
+    #[test]
+    fn archived_days_preserve_streaks_and_do_not_create_partial_baselines() {
+        let directory = tempdir().unwrap();
+        let database = directory.path().join("hyprtrack.db");
+        initialize_database(&database).unwrap();
+        let connection = Connection::open(&database).unwrap();
+        for day in ["2026-06-12", "2026-06-13"] {
+            connection
+                .execute(
+                    "INSERT INTO activity_daily_summaries VALUES (?1, 'code', 3600, 2)",
+                    [day],
+                )
+                .unwrap();
+        }
+        connection.execute("INSERT INTO activity_samples (sampled_at, ended_at, app_class, window_title, window_full) VALUES ('2026-06-14T10:00:00+05:30', '2026-06-14T11:00:00+05:30', 'code', 'VS Code', '')", []).unwrap();
+        let end = parse_time("2026-06-14T12:00:00+05:30").unwrap();
+        assert_eq!(calculate_streak(&connection, &end).unwrap(), 3);
+        let previous = previous_range(&resolve_range("30d").unwrap());
+        connection
+            .execute(
+                "INSERT OR IGNORE INTO activity_daily_summaries VALUES (?1, 'code', 3600, 2)",
+                [previous.start.format("%Y-%m-%d").to_string()],
+            )
+            .unwrap();
+        drop(connection);
+        let insights = read_insights(database.to_str().unwrap(), "30d", 25.0, &[]).unwrap();
+        assert!(insights.comparisons.focus_continuity.detail_archived);
+        assert!(insights
+            .comparisons
+            .tracked_minutes
+            .percent_change
+            .is_none());
     }
 
     #[test]

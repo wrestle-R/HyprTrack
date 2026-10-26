@@ -15,7 +15,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from threading import Event
+from threading import Event, Thread
 
 
 DEFAULT_DATABASE = Path(__file__).resolve().with_name("hyprtrack.db")
@@ -702,6 +702,18 @@ def _run(
         previous_handlers[signum] = signal.getsignal(signum)
         signal.signal(signum, request_stop)
 
+    network_worker = None
+    try:
+        from hyprtrack_network import run_network_worker
+
+        network_worker = Thread(
+            target=run_network_worker, args=(db_path, stop_event),
+            name="hyprtrack-network", daemon=True,
+        )
+        network_worker.start()
+    except (ImportError, SyntaxError):
+        print("HyprTrack: network module unavailable; screen time is still recording.", file=sys.stderr)
+
     try:
         reconnect_delay = 0.25
         while not stop_event.is_set():
@@ -734,7 +746,10 @@ def _run(
                     MAX_RECONNECT_DELAY,
                 )
     finally:
+        stop_event.set()
         tracker.close(now_ist())
+        if network_worker is not None:
+            network_worker.join(timeout=10)
         for signum, handler in previous_handlers.items():
             signal.signal(signum, handler)
         print("HyprTrack stopped.", file=sys.stderr)

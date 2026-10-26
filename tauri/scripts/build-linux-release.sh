@@ -117,10 +117,13 @@ npm test
 npm run build
 python3 -m unittest discover -s ../collector/tests
 cargo test --manifest-path src-tauri/Cargo.toml
+node --test scripts/updater-manifest.check.mjs
+updater_config=()
+if [[ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]]; then updater_config=(--config src-tauri/tauri.updater.conf.json); fi
 npm run tauri -- build --bundles deb,rpm
 
 set +e
-npm run tauri -- build --bundles appimage
+npm run tauri -- build --bundles appimage "${updater_config[@]}"
 appimage_build_status=$?
 set -e
 if [[ "$appimage_build_status" -ne 0 ]]; then
@@ -159,8 +162,21 @@ if [[ "${#generated[@]}" -ne 1 ]]; then
 fi
 mv "${generated[0]}" "$appimage_dir/$artifact_name"
 
+# Sign AFTER the AppImage is patched and repacked. Tauri's original signature
+# no longer describes these final bytes.
+if [[ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]]; then
+  if [[ -f "$TAURI_SIGNING_PRIVATE_KEY" ]]; then
+    env -u TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PATH="$TAURI_SIGNING_PRIVATE_KEY" \
+      npm run tauri -- signer sign "$appimage_dir/$artifact_name"
+  else
+    npm run tauri -- signer sign "$appimage_dir/$artifact_name"
+  fi
+  node scripts/updater-manifest.mjs "$appimage_dir" "$version"
+  node scripts/updater-manifest.mjs "$appimage_dir" "$version" --check
+fi
+
 find "$bundle_dir" \
-  -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) \
+  -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage.sig' -o -name 'latest.json' \) \
   -print0 | sort -z | while IFS= read -r -d '' artifact; do
     artifact_checksum="$(sha256sum "$artifact")"
     printf '%s  %s\n' "${artifact_checksum%% *}" "$(basename "$artifact")"

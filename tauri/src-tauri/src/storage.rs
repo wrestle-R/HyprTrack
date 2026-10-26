@@ -1,6 +1,8 @@
 use rusqlite::{backup::Backup, Connection};
 use std::{fs, path::Path};
 
+const NETWORK_SCHEMA: &str = include_str!("../../../collector/network-schema.sql");
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum MigrationResult {
     Created,
@@ -51,6 +53,9 @@ pub fn initialize_database(database_path: &Path) -> Result<(), String> {
                 .map_err(|error| error.to_string())?;
         }
     }
+    connection
+        .execute_batch(NETWORK_SCHEMA)
+        .map_err(|error| error.to_string())?;
     Ok(())
 }
 

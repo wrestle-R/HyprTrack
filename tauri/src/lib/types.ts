@@ -47,6 +47,7 @@ export type ComparisonValue = {
   current: number
   previous: number
   percentChange: number | null
+  detailArchived?: boolean
 }
 
 export type RhythmCell = {
@@ -75,6 +76,7 @@ export type InsightsData = {
   }
   rhythm: RhythmCell[]
   dailyTrend: DailyInsightPoint[]
+  focusQuality: FocusQuality
   highlights: {
     peakWorkingWindow: string | null
     strongestFocusDay: string | null
@@ -131,6 +133,8 @@ export type DesktopPage =
   | "insights"
   | "applications"
   | "activity"
+  | "dataflow"
+  | "whats-new"
   | "mappings"
   | "settings"
   | "keybindings"

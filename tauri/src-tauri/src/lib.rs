@@ -1,6 +1,8 @@
 mod analytics;
 mod desktop_integration;
+mod network;
 mod storage;
+mod updater;
 
 use std::{fs, path::PathBuf};
 
@@ -19,6 +21,20 @@ use tauri::{
 const COLLECTOR_SCRIPT_BYTES: &[u8] = include_bytes!("../../../collector/hyprtrack-monitor.py");
 const COLLECTOR_SCRIPT_NAME: &str = "hyprtrack-monitor.py";
 const COLLECTOR_DATABASE_NAME: &str = "hyprtrack.db";
+const COLLECTOR_COMPANIONS: &[(&str, &[u8])] = &[
+    (
+        "hyprtrack_network.py",
+        include_bytes!("../../../collector/hyprtrack_network.py"),
+    ),
+    (
+        "network-schema.sql",
+        include_bytes!("../../../collector/network-schema.sql"),
+    ),
+    (
+        "setup-network.sh",
+        include_bytes!("../../../collector/setup-network.sh"),
+    ),
+];
 
 struct AppState {
     database_path: PathBuf,
@@ -92,6 +108,11 @@ fn get_applications(
 #[tauri::command]
 fn get_health(state: State<'_, AppState>) -> Result<HealthData, String> {
     read_health(&database_string(&state))
+}
+
+#[tauri::command]
+fn get_network(range: String, state: State<'_, AppState>) -> Result<network::NetworkData, String> {
+    network::read_network(&database_string(&state), &range)
 }
 
 #[tauri::command]
@@ -182,6 +203,19 @@ fn install_collector_script() -> Result<PathBuf, String> {
     };
     fs::create_dir_all(parent).map_err(|error| error.to_string())?;
 
+    for (name, contents) in COLLECTOR_COMPANIONS {
+        let path = parent.join(name);
+        if fs::read(&path)
+            .map(|existing| existing != *contents)
+            .unwrap_or(true)
+        {
+            // Atomic replacement prevents a running worker reading a partial module/schema.
+            let temporary = path.with_extension("new");
+            fs::write(&temporary, contents).map_err(|error| error.to_string())?;
+            fs::rename(&temporary, &path).map_err(|error| error.to_string())?;
+        }
+    }
+
     let needs_write = fs::read(&script_path)
         .map(|existing| existing != COLLECTOR_SCRIPT_BYTES)
         .unwrap_or(true);
@@ -210,7 +244,12 @@ pub fn run() {
             show_main_window_impl(app);
         }))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            eprintln!(
+                "HyprTrack Desktop v{} is running.",
+                env!("CARGO_PKG_VERSION")
+            );
             if let Err(error) = configure_appimage_desktop_integration() {
                 eprintln!("HyprTrack could not install its application launcher: {error}");
             }
@@ -250,6 +289,10 @@ pub fn run() {
             get_activity,
             get_applications,
             get_health,
+            get_network,
+            updater::get_app_info,
+            updater::check_app_update,
+            updater::install_app_update,
             show_main_window,
         ])
         .build(tauri::generate_context!())

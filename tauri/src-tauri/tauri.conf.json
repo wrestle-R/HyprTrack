@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "HyprTrack Desktop",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "identifier": "com.hyprtrack.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -43,5 +43,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQyNDRBQjk5M0IwQzhDNDcKUldSSGpBdzdtYXRFUWlVRm5Bc3BFaEg4Nm1OQ1NDbDdYTE5STEU4dy93cmk1dXA3eVlqY20wcWIK",
+      "endpoints": [
+        "https://github.com/wrestle-R/HyprTrack/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

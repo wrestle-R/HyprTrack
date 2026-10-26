@@ -1,8 +1,11 @@
 import * as React from "react"
 import {
   Activity01Icon,
-  Analytics01Icon,
+  Idea01Icon,
+  GridViewIcon,
   Home01Icon,
+  InternetIcon,
+  News01Icon,
   KeyboardIcon,
   MapsEditingIcon,
   Moon02Icon,
@@ -31,6 +34,9 @@ import {
 import { HyprTrackMark } from "./components/hyprtrack-mark"
 import { KeybindingsPage } from "./components/keybindings-page"
 import { MappingsPage } from "./components/mappings-page"
+import { DataflowPage } from "./components/dataflow-page"
+import { UpdateControl, WhatsNewPage } from "./components/app-updates"
+import { useAppUpdate, type AppUpdateState } from "./hooks/use-app-update"
 import { useDesktopQuery } from "./hooks/use-desktop-query"
 import {
   getActivity,
@@ -75,9 +81,10 @@ const PAGES: Array<{
   icon: typeof Home01Icon
 }> = [
   { id: "overview", label: "Overview", icon: Home01Icon },
-  { id: "insights", label: "Insights", icon: Analytics01Icon },
-  { id: "applications", label: "Applications", icon: Analytics01Icon },
+  { id: "insights", label: "Insights", icon: Idea01Icon },
+  { id: "applications", label: "Applications", icon: GridViewIcon },
   { id: "activity", label: "Activity", icon: Activity01Icon },
+  { id: "dataflow", label: "Dataflow", icon: InternetIcon },
   { id: "mappings", label: "Mappings", icon: MapsEditingIcon },
   { id: "settings", label: "Settings", icon: Settings01Icon },
 ]
@@ -568,8 +575,10 @@ function ApplicationsPage({
 function SettingsPage({
   preferences,
   updatePreferences,
+  update,
 }: {
   preferences: DesktopPreferences
+  update: AppUpdateState
   updatePreferences: (
     update:
       | Partial<DesktopPreferences>
@@ -717,37 +726,8 @@ function SettingsPage({
         </div>
       </section>
 
-      <section className="panel">
-        <div className="panel-header">
-          <div>
-            <h2>Collector</h2>
-            <p>
-              HyprTrack exports a Python collector for Hyprland autostart and
-              reads the SQLite database it writes beside the script.
-            </p>
-          </div>
-          <span className="pill">Python</span>
-        </div>
-        <div className="collector-details">
-          <div>
-            <span>Script</span>
-            <strong>~/.local/bin/hyprtrack/collector/hyprtrack-monitor.py</strong>
-          </div>
-          <div>
-            <span>Database</span>
-            <strong>~/.local/bin/hyprtrack/collector/hyprtrack.db</strong>
-          </div>
-          <div>
-            <span>Autostart</span>
-            <strong>
-              hl.exec_cmd("$HOME/.local/bin/hyprtrack/collector/hyprtrack-monitor.py")
-            </strong>
-          </div>
-        </div>
-        <p className="collector-message">
-          Add the autostart command to your Hyprland exec config to keep
-          tracking alive after login.
-        </p>
+      <section className="panel" aria-label="Version and updates">
+        <UpdateControl update={update} />
       </section>
 
       <section className="panel">
@@ -842,6 +822,7 @@ function SettingsPage({
 
 function App() {
   const { preferences, updatePreferences } = useDesktopPreferences()
+  const update = useAppUpdate()
   const [page, setPage] = React.useState<DesktopPage>("overview")
   const [rangeOverride, setRangeOverride] = React.useState<RangeKey | null>(null)
   const [refreshVersion, setRefreshVersion] = React.useState(0)
@@ -876,6 +857,12 @@ function App() {
     setRefreshRequestedAt(new Date())
     setRefreshVersion((version) => version + 1)
   }, [])
+
+  React.useEffect(() => {
+    const refreshVisible = () => { if (document.visibilityState !== "hidden") requestRefresh() }
+    window.addEventListener("focus", refreshVisible)
+    return () => window.removeEventListener("focus", refreshVisible)
+  }, [requestRefresh])
 
   const runShortcutAction = React.useCallback(
     (action: ShortcutActionId) => {
@@ -970,7 +957,7 @@ function App() {
   React.useEffect(() => {
     if (
       !autoRefreshEnabled ||
-      !["overview", "insights", "applications", "activity"].includes(page)
+      !["overview", "insights", "applications", "activity", "dataflow"].includes(page)
     ) {
       return
     }
@@ -981,12 +968,13 @@ function App() {
 
   const pageTitle =
     PAGES.find((item) => item.id === page)?.label ??
-    (page === "keybindings" ? KEYBINDINGS_PAGE.label : "HyprTrack")
+    (page === "keybindings" ? KEYBINDINGS_PAGE.label : page === "whats-new" ? "What’s New" : "HyprTrack")
   const isDataPage = [
     "overview",
     "insights",
     "applications",
     "activity",
+    "dataflow",
   ].includes(page)
 
   return (
@@ -1016,6 +1004,7 @@ function App() {
           ))}
         </nav>
         <nav className="nav-stack utility-nav" aria-label="Utility navigation">
+          <button className={`nav-item ${page === "whats-new" ? "active" : ""}`} type="button" onClick={() => setPage("whats-new")} aria-label="What’s New" aria-current={page === "whats-new" ? "page" : undefined}><HugeiconsIcon icon={News01Icon} strokeWidth={1.8} /><strong>What’s New</strong></button>
           <button
             className={`nav-item ${page === "keybindings" ? "active" : ""}`}
             type="button"
@@ -1034,6 +1023,7 @@ function App() {
         <header className="topbar">
           <div className="page-heading"><span className="page-breadcrumb">Your workspace</span><h2>{pageTitle}</h2></div>
           <div className="topbar-actions">
+            <UpdateControl update={update} compact />
             {isDataPage ? (
               <>
                 <RangeControl range={range} onChange={setRangeOverride} />
@@ -1076,11 +1066,12 @@ function App() {
         </header>
 
         <section className="content-area" id="main-content" tabIndex={-1} ref={contentAreaRef}>
+          {page === "dataflow" ? <DataflowPage range={range} refreshVersion={refreshVersion} /> : null}
           {page === "overview" ? (
             <OverviewPage
               range={range}
               refreshVersion={refreshVersion}
-              productiveTitles={preferences.productiveTitles}
+              onOpenDataflow={() => setPage("dataflow")}
               focusThresholdMinutes={preferences.focusThresholdMinutes}
               mappingRules={preferences.mappingRules}
             />
@@ -1118,8 +1109,10 @@ function App() {
             <SettingsPage
               preferences={preferences}
               updatePreferences={updatePreferences}
+              update={update}
             />
           ) : null}
+          {page === "whats-new" ? <WhatsNewPage version={update.info.version} /> : null}
           {page === "keybindings" ? (
             <KeybindingsPage
               bindings={preferences.keybindings}

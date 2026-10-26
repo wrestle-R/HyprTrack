@@ -97,6 +97,10 @@ vi.mock("@tauri-apps/api/core", () => ({
               percentChange: -25,
             },
           },
+          focusQuality: {
+            focusedMinutes: 60, continuityPercent: 50, longestFocusedBlockMinutes: 42,
+            averageSessionMinutes: 20, contextSwitches: 3, switchesPerTrackedHour: 1.5,
+          },
           rhythm: [],
           dailyTrend: [],
           highlights: {
@@ -174,6 +178,7 @@ describe("App", () => {
       "Insights",
       "Applications",
       "Activity",
+      "Dataflow",
       "Mappings",
       "Settings",
     ])
@@ -197,13 +202,15 @@ describe("App", () => {
     expect(autoRefresh).toBeChecked()
   })
 
-  it("replaces overview application usage with focus quality", async () => {
+  it("keeps Overview activity-led and moves focus quality to Insights", async () => {
+    const user = userEvent.setup()
     render(<App />)
 
-    expect(
-      await screen.findByRole("heading", { name: "Focus quality" })
-    ).toBeInTheDocument()
-    expect(screen.getByText("50%")).toBeInTheDocument()
+    expect(await screen.findByRole("button", { name: "Open Dataflow internet usage" })).toBeInTheDocument()
+    expect(screen.queryByRole("heading", { name: "Focus quality" })).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Insights" }))
+    expect(await screen.findByRole("heading", { name: "Focus quality" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Focus quality" }).closest("section")).toHaveTextContent("50%")
     expect(screen.queryByRole("heading", { name: "Application usage" })).not.toBeInTheDocument()
   })
 
@@ -253,16 +260,15 @@ describe("App", () => {
     )
   })
 
-  it("shows collector setup without service action buttons", async () => {
+  it("shows version and update controls instead of collector setup", async () => {
     const user = userEvent.setup()
 
     render(<App />)
     await user.click(await screen.findByRole("button", { name: "Settings" }))
 
-    expect(await screen.findByRole("heading", { name: "Collector" })).toBeInTheDocument()
-    expect(screen.getByText("~/.local/bin/hyprtrack/collector/hyprtrack-monitor.py")).toBeInTheDocument()
-    expect(screen.getByText("~/.local/bin/hyprtrack/collector/hyprtrack.db")).toBeInTheDocument()
-    expect(screen.getByText(/hl\.exec_cmd/)).toBeInTheDocument()
+    expect(await screen.findByRole("region", { name: "Version and updates" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Check for updates" })).toBeInTheDocument()
+    expect(screen.queryByRole("heading", { name: "Collector" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Install Service" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Start Service" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Restart Service" })).not.toBeInTheDocument()
