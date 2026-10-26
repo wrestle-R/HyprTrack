@@ -148,7 +148,7 @@ fi
 
 prepare_appimage_runtime
 
-rm -f "$appimage_dir"/*.AppImage
+rm -f "$appimage_dir"/*.AppImage "$appimage_dir"/*.AppImage.sig
 (
   cd "$appimage_dir"
   ARCH=x86_64 "$APPIMAGE_PLUGIN" --appdir="$appdir"
@@ -174,6 +174,17 @@ if [[ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]]; then
   node scripts/updater-manifest.mjs "$appimage_dir" "$version"
   node scripts/updater-manifest.mjs "$appimage_dir" "$version" --check
 fi
+
+# Keep published names stable: GitHub normalizes spaces in uploaded filenames.
+for package_dir in deb rpm; do
+  while IFS= read -r -d '' package; do
+    package_name="$(basename "$package")"
+    normalized_name="${package_name// /.}"
+    if [[ "$package_name" != "$normalized_name" ]]; then
+      mv "$package" "$(dirname "$package")/$normalized_name"
+    fi
+  done < <(find "$bundle_dir/$package_dir" -maxdepth 1 -type f -print0)
+done
 
 find "$bundle_dir" \
   -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage.sig' -o -name 'latest.json' \) \
