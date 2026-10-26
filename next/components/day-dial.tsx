@@ -3,15 +3,19 @@
 import { useEffect, useState } from "react";
 
 const segments = [
-  { start: 0, end: 390, color: "var(--dial-empty)", app: "Away", kind: "Untracked time" },
-  { start: 390, end: 450, color: "#a09a8c", app: "Terminal", kind: "Getting started" },
-  { start: 450, end: 635, color: "var(--accent)", app: "VS Code", kind: "Building something" },
-  { start: 635, end: 705, color: "#747e5d", app: "Firefox", kind: "A little research" },
-  { start: 705, end: 795, color: "var(--dial-empty)", app: "Away", kind: "Room for a break" },
-  { start: 795, end: 995, color: "var(--accent)", app: "VS Code", kind: "Back in the flow" },
-  { start: 995, end: 1065, color: "#747e5d", app: "Firefox", kind: "Reading the docs" },
-  { start: 1065, end: 1125, color: "#a09a8c", app: "Terminal", kind: "Wrapping things up" },
-  { start: 1125, end: 1440, color: "var(--dial-empty)", app: "Away", kind: "The rest of your day" },
+  { start: 0, end: 60, color: "var(--accent)", app: "VS Code", kind: "One more idea" },
+  { start: 60, end: 90, color: "#747e5d", app: "Firefox", kind: "Winding down" },
+  { start: 90, end: 600, color: "var(--dial-empty)", app: "Sleep", kind: "1:30 am to 10 am" },
+  { start: 600, end: 630, color: "#a09a8c", app: "Terminal", kind: "Getting started" },
+  { start: 630, end: 705, color: "#747e5d", app: "Firefox", kind: "A little research" },
+  { start: 705, end: 780, color: "var(--accent)", app: "VS Code", kind: "Building something" },
+  { start: 780, end: 840, color: "var(--dial-empty)", app: "Away", kind: "Room for a break" },
+  { start: 840, end: 1080, color: "var(--accent)", app: "VS Code", kind: "Back in the flow" },
+  { start: 1080, end: 1140, color: "#a09a8c", app: "Terminal", kind: "Wrapping things up" },
+  { start: 1140, end: 1260, color: "var(--dial-empty)", app: "Away", kind: "The rest of your day" },
+  { start: 1260, end: 1320, color: "#747e5d", app: "Firefox", kind: "A little reading" },
+  { start: 1320, end: 1395, color: "#7b9270", app: "Minecraft", kind: "A few blocks, sometimes" },
+  { start: 1395, end: 1440, color: "var(--accent)", app: "VS Code", kind: "Back to that idea" },
 ];
 function point(minutes: number, radius: number) {
   const angle = minutes / 1440 * Math.PI * 2 - Math.PI / 2;

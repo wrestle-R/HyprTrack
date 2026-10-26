@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { DOWNLOAD } from "../lib/site";
 
 const chapters = ["getting-started","collector","themes-and-focus","mappings","shortcuts","updating","privacy","troubleshooting"];
 
@@ -11,7 +12,7 @@ test("home and every handbook chapter render without browser errors", async ({pa
     expect(response?.status(),path).toBe(200);
     await expect(page.locator("h1")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),path).toBe(true);
-    await expect(page.locator('a[href*="releases/download/v2.1.0/"]').first()).toHaveAttribute("href",/HyprTrack\.Desktop_2\.1\.0_amd64\.AppImage$/);
+    await expect(page.locator(`a[href="${DOWNLOAD}"]`).first()).toHaveAttribute("href",DOWNLOAD);
   }
   expect(errors).toEqual([]);
 });
@@ -34,6 +35,15 @@ test("the day instrument responds to keyboard input",async({page}) => {
   await page.goto("/");
   const slider=page.getByRole("slider",{name:/Drag through a day/});
   await expect(page.locator(".dial-time")).toHaveText("08:42");
+  await expect(page.locator(".dial-app")).toHaveText("Sleep");
+  await slider.fill("90");
+  await expect(page.locator(".dial-app")).toHaveText("Sleep");
+  await slider.fill("599");
+  await expect(page.locator(".dial-app")).toHaveText("Sleep");
+  await slider.fill("600");
+  await expect(page.locator(".dial-app")).toHaveText("Terminal");
+  await slider.fill("1335");
+  await expect(page.locator(".dial-app")).toHaveText("Minecraft");
   await slider.fill("660");
   await expect(page.locator(".dial-time")).toHaveText("11:00");
   await expect(page.locator(".dial-app")).toHaveText("Firefox");
@@ -120,7 +130,7 @@ test("install commands copy exactly and remain selectable",async({page,context})
   await page.getByRole("button",{name:"Copy Quick start / Arch Linux x86_64 commands"}).click();
   await expect(page.getByText("Copied",{exact:true})).toBeVisible();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
-  expect(copied).toContain("releases/download/v2.1.0/HyprTrack.Desktop_2.1.0_amd64.AppImage");
+  expect(copied).toContain(DOWNLOAD);
   expect(copied).toContain("chmod +x ~/.local/bin/hyprtrack-desktop.AppImage");
 });
 
