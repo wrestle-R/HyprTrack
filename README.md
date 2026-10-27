@@ -52,13 +52,13 @@ is not uploaded anywhere.
 
 ## Install On Arch Linux
 
-The current release is `v2.2.0`. Download the AppImage into a permanent
+The current release is `v2.2.1`. Download the AppImage into a permanent
 location:
 
 ```bash
 mkdir -p ~/.local/bin
 wget -O ~/.local/bin/hyprtrack-desktop.AppImage \
-  https://github.com/wrestle-R/HyprTrack/releases/download/v2.2.0/HyprTrack.Desktop_2.2.0_amd64.AppImage
+  https://github.com/wrestle-R/HyprTrack/releases/download/v2.2.1/HyprTrack.Desktop_2.2.1_amd64.AppImage
 chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
 ```
@@ -91,14 +91,14 @@ script. It does not replace or delete the existing activity database at:
 
 Create a SQLite-safe backup first, then replace the AppImage. The commands
 below also record the pre-update row count and integrity result so you can
-confirm the same database is still healthy after the first `2.2.0` launch.
+confirm the same database is still healthy after the first `2.2.1` launch.
 Change
 `VERSION` to the release you want to install:
 
 ### Update From A Published Release
 
 ```bash
-VERSION=2.2.0
+VERSION=2.2.1
 mkdir -p ~/.local/share/hyprtrack-backups
 database="$HOME/.local/bin/hyprtrack/collector/hyprtrack.db"
 backup="$HOME/.local/share/hyprtrack-backups/hyprtrack-$(date +%Y%m%d-%H%M%S).db"
@@ -124,7 +124,11 @@ Releases page.
 
 If `Rows before update` and `Rows after update` match and both integrity
 results are `ok`, the AppImage replacement kept the same
-`~/.local/bin/hyprtrack/collector/hyprtrack.db` intact.
+`~/.local/bin/hyprtrack/collector/hyprtrack.db` intact. Once the updated
+collector restarts, raw row counts can decrease as records older than 30 complete
+IST days become daily totals in `activity_daily_summaries`. Those summaries
+remain permanently; compare raw and archived totals together when checking
+historical usage.
 
 ## Start Tracking From Hyprland
 
@@ -180,7 +184,7 @@ collector still requires restarting its existing command once to load new code.
 
 **What’s New** in the sidebar keeps the release history available offline.
 DEB/RPM installations show the version and release notes but use their package
-manager for updates. Updating from 2.1.0 to 2.2.0 uses the existing manual update
+manager for updates. Updating from 2.1.0 to 2.2.1 uses the existing manual update
 instructions once; subsequent AppImage releases support the in-app updater.
 
 Release builds use `TAURI_SIGNING_PRIVATE_KEY` and the public key in
@@ -271,7 +275,7 @@ setup as required.
 
 ## Version History
 
-### v2.2.0 — Every byte has a place now
+### v2.2.1 — Every byte has a place now
 
 Adds Dataflow for per-app downloads/uploads, a small internet summary in the
 Overview metric strip, and moves Focus quality into Insights. Both collectors

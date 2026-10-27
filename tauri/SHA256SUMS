@@ -1,3 +1,5 @@
-75851fc444efbb01bde94a3e9868dca1b842c00de0897ddf4d815f1c86ae2ac2  /home/rdp/Desktop/code/HyprTrack/tauri/src-tauri/target/release/bundle/appimage/HyprTrack.Desktop_2.0.1_amd64.AppImage
-1b659e3abd7957a5879dab59579b4d6b2be83fa03e403dd056e86207e1e2624d  /home/rdp/Desktop/code/HyprTrack/tauri/src-tauri/target/release/bundle/deb/HyprTrack Desktop_2.0.1_amd64.deb
-9221306c886f58ca22555a52a08452ebbc735289505eed10c19bceebe2691169  /home/rdp/Desktop/code/HyprTrack/tauri/src-tauri/target/release/bundle/rpm/HyprTrack Desktop-2.0.1-1.x86_64.rpm
+7c3dee52d59b1f7dde587983b8ae911cb2c931f14f8494871e68ab5b502b5b54  HyprTrack.Desktop_2.2.1_amd64.AppImage
+6e7b296a3e5f37af36a6a430be7f7d8a1e7fb9ed7055e0aa6be8ada9972752f1  HyprTrack.Desktop_2.2.1_amd64.AppImage.sig
+a5152f9efee24f1dac233fc6a3c81806989a9eed187f82d60a29355b3b5f13d8  latest.json
+eb893215dfb5fd389ebd0cc3fdab1abdce19e2189ca07e69fdb1b39a58f1cdf2  HyprTrack.Desktop_2.2.1_amd64.deb
+76d3a7eba9da09b045ba014e0f321ad6c278940a1b2d6b19ecd2394667321059  HyprTrack.Desktop-2.2.1-1.x86_64.rpm
