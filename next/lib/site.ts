@@ -1,4 +1,4 @@
-export const VERSION = "2.2.1";
+export const VERSION = "2.2.2";
 export const REPO = "https://github.com/wrestle-R/HyprTrack";
 export const RELEASE = `${REPO}/releases/tag/v${VERSION}`;
 export const DOWNLOAD = `${REPO}/releases/download/v${VERSION}/HyprTrack.Desktop_${VERSION}_amd64.AppImage`;
