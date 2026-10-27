@@ -4,6 +4,7 @@ import packageInfo from "../../package.json"
 
 export function useAppUpdate() {
   const [info, setInfo] = useState<AppInfo>({ version: packageInfo.version, updateSupported: false })
+  const [infoLoaded, setInfoLoaded] = useState(false)
   const [availableVersion, setAvailableVersion] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -26,6 +27,7 @@ export function useAppUpdate() {
         const app = await getAppInfo()
         if (!mounted.current || generation.current !== epoch || !app) return
         setInfo(app)
+        setInfoLoaded(true)
         if (app.updateSupported) {
           const version = await checkAppUpdate()
           if (!mounted.current || generation.current !== epoch) return
@@ -101,7 +103,7 @@ export function useAppUpdate() {
     }
   }, [check])
 
-  return { info, availableVersion, checking, busy, checked, error, progress, check, install }
+  return { info, infoLoaded, availableVersion, checking, busy, checked, error, progress, check, install }
 }
 
 export type AppUpdateState = ReturnType<typeof useAppUpdate>

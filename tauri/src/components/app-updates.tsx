@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { AppUpdateState } from "../hooks/use-app-update"
-import releases from "../lib/releases.json"
+import type { ReleaseNotice } from "../hooks/use-release-notice"
 import "./app-updates.css"
 
 function progressLabel(update: AppUpdateState) {
@@ -34,13 +34,22 @@ export function UpdateControl({ update, compact = false }: { update: AppUpdateSt
   </div>
 }
 
-export function WhatsNewPage({ version }: { version: string }) {
-  return <div className="page-stack whats-new-page">
-    <section className="hero-panel"><div><p className="eyebrow">The release notebook</p><h1>What’s new in HyprTrack</h1><p className="hero-copy">The useful additions, the small fixes, and what changed along the way.</p></div><span className="pill">Installed v{version}</span></section>
-    {releases.map((release, index) => <article className="panel release-entry" key={release.version}>
-      <div className="release-entry-meta"><span className="pill">v{release.version}</span><time dateTime={release.date}>{new Intl.DateTimeFormat("en-IN", {day:"numeric",month:"long",year:"numeric",timeZone:"Asia/Kolkata"}).format(new Date(`${release.date}T00:00:00+05:30`))}</time>{index === 0 ? <span>Latest in this app</span> : null}</div>
-      <h2>{release.title}</h2><ul>{release.highlights.map((highlight) => <li key={highlight}>{highlight}</li>)}</ul>
-    </article>)}
-    <p className="release-notes-footnote">Release notes are included with the app and work offline.</p>
-  </div>
+export function ReleaseNoticeDialog({ notice, onDismiss }: { notice: ReleaseNotice; onDismiss: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null)
+  const closeButton = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    const element = dialog.current
+    element?.showModal()
+    closeButton.current?.focus()
+    return () => element?.close()
+  }, [])
+  return <dialog ref={dialog} className="release-notice" aria-labelledby="release-notice-title" onCancel={(event) => { event.preventDefault(); onDismiss() }}>
+    <div className="release-notice-header"><p className="eyebrow">Updated to v{notice.version}</p><h1 id="release-notice-title">What’s new in HyprTrack</h1>
+      <p>{notice.previousVersion ? `Changes since v${notice.previousVersion}.` : "Here’s what changed in this release."} {notice.releases.length > 1 ? `${notice.releases.length} updates included.` : ""}</p></div>
+    <div className="release-notice-content">{notice.releases.map(release => <article className="release-entry" key={release.version}>
+      <div className="release-entry-meta"><span className="pill">v{release.version}</span><time dateTime={release.date}>{new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" }).format(new Date(`${release.date}T00:00:00+05:30`))}</time></div>
+      <h2>{release.title}</h2><ul>{release.highlights.map(highlight => <li key={highlight}>{highlight}</li>)}</ul>
+    </article>)}</div>
+    <div className="release-notice-footer"><span>These notes won’t appear again for this version.</span><button ref={closeButton} className="button primary" type="button" onClick={onDismiss}>Continue to HyprTrack</button></div>
+  </dialog>
 }

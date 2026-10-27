@@ -1,7 +1,7 @@
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
 
 static INSTALLING: AtomicBool = AtomicBool::new(false);
@@ -18,14 +18,28 @@ impl Drop for InstallGuard {
 pub struct AppInfo {
     version: &'static str,
     update_supported: bool,
+    has_existing_activity: bool,
 }
 
-#[tauri::command]
-pub fn get_app_info() -> AppInfo {
+fn runtime_info() -> AppInfo {
     AppInfo {
         version: env!("CARGO_PKG_VERSION"),
         update_supported: std::env::var_os("APPIMAGE").is_some(),
+        has_existing_activity: false,
     }
+}
+
+#[tauri::command]
+pub fn get_app_info(app: AppHandle) -> AppInfo {
+    let mut info = runtime_info();
+    let state = app.state::<crate::AppState>();
+    info.has_existing_activity = rusqlite::Connection::open_with_flags(
+        &state.database_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    ).and_then(|connection| connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM activity_samples LIMIT 1) OR EXISTS(SELECT 1 FROM activity_daily_summaries LIMIT 1)",
+        [], |row| row.get(0),
+    )).unwrap_or(false);
+    info
 }
 
 fn updater(app: &AppHandle) -> Result<tauri_plugin_updater::Updater, String> {
@@ -39,7 +53,7 @@ fn updater(app: &AppHandle) -> Result<tauri_plugin_updater::Updater, String> {
 
 #[tauri::command]
 pub async fn check_app_update(app: AppHandle) -> Result<Option<String>, String> {
-    if !get_app_info().update_supported || INSTALLING.load(Ordering::Acquire) {
+    if !runtime_info().update_supported || INSTALLING.load(Ordering::Acquire) {
         return Ok(None);
     }
     updater(&app)?
@@ -80,7 +94,7 @@ fn emit(
 
 #[tauri::command]
 pub async fn install_app_update(app: AppHandle) -> Result<String, String> {
-    if !get_app_info().update_supported {
+    if !runtime_info().update_supported {
         return Err("In-app updates require the Linux AppImage. Update DEB/RPM installations through their package manager.".into());
     }
     INSTALLING

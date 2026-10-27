@@ -134,7 +134,6 @@ export type DesktopPage =
   | "applications"
   | "activity"
   | "dataflow"
-  | "whats-new"
   | "mappings"
   | "settings"
   | "keybindings"

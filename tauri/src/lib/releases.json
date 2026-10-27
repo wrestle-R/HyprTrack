@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.2.2",
+    "date": "2026-10-27",
+    "title": "Updates, without the clutter",
+    "highlights": [
+      "The sidebar keeps just the HyprTrack name, with the extra tagline removed.",
+      "What’s New appears once after an update, showing only the changes since the last recorded version. It no longer takes up a sidebar tab.",
+      "The top bar shows an update button only when a newer app version is available. Settings keeps the installed version and manual update checks."
+    ]
+  },
+  {
     "version": "2.2.1",
     "date": "2026-10-27",
     "title": "Every byte has a place now",

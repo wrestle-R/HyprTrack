@@ -19,3 +19,13 @@
 .release-notes-footnote { font-size: .75rem; color: var(--muted-foreground); }
 @media (max-width: 650px) { .release-entry { padding: 1.2rem; } }
 @media (prefers-reduced-motion: reduce) { .app-update-track.indeterminate span { animation: none; } }
+
+.release-notice { width: min(42rem, calc(100vw - 2rem)); max-height: min(85vh, 48rem); padding: 0; border: 1px solid var(--border); border-radius: 1rem; background: var(--card); color: var(--foreground); box-shadow: var(--shadow); }
+.release-notice::backdrop { background: rgb(0 0 0 / .46); backdrop-filter: blur(4px); }
+.release-notice-header { padding: 1.8rem 2rem 1rem; }
+.release-notice-header h1 { font-family: "Bricolage Grotesque", sans-serif; font-size: 1.8rem; letter-spacing: -.04em; margin: .5rem 0; }
+.release-notice-header > p:last-child { color: var(--muted-foreground); font-size: .8rem; }
+.release-notice-content .release-entry { padding: 1rem 2rem; border-top: 1px solid var(--border); }
+.release-notice-footer { padding: 1rem 2rem 1.5rem; display: flex; align-items: center; gap: 1rem; justify-content: space-between; }
+.release-notice-footer > span { color: var(--muted-foreground); font-size: .7rem; max-width: 13rem; line-height: 1.6; }
+@media (max-width: 650px) { .release-notice-header, .release-notice-content .release-entry, .release-notice-footer { padding-left: 1.2rem; padding-right: 1.2rem; } .release-notice-footer { flex-direction: column; align-items: flex-start; } }

@@ -52,13 +52,13 @@ is not uploaded anywhere.
 
 ## Install On Arch Linux
 
-The current release is `v2.2.1`. Download the AppImage into a permanent
+The current release is `v2.2.2`. Download the AppImage into a permanent
 location:
 
 ```bash
 mkdir -p ~/.local/bin
 wget -O ~/.local/bin/hyprtrack-desktop.AppImage \
-  https://github.com/wrestle-R/HyprTrack/releases/download/v2.2.1/HyprTrack.Desktop_2.2.1_amd64.AppImage
+  https://github.com/wrestle-R/HyprTrack/releases/download/v2.2.2/HyprTrack.Desktop_2.2.2_amd64.AppImage
 chmod +x ~/.local/bin/hyprtrack-desktop.AppImage
 ~/.local/bin/hyprtrack-desktop.AppImage
 ```
@@ -91,14 +91,14 @@ script. It does not replace or delete the existing activity database at:
 
 Create a SQLite-safe backup first, then replace the AppImage. The commands
 below also record the pre-update row count and integrity result so you can
-confirm the same database is still healthy after the first `2.2.1` launch.
+confirm the same database is still healthy after the first `2.2.2` launch.
 Change
 `VERSION` to the release you want to install:
 
 ### Update From A Published Release
 
 ```bash
-VERSION=2.2.1
+VERSION=2.2.2
 mkdir -p ~/.local/share/hyprtrack-backups
 database="$HOME/.local/bin/hyprtrack/collector/hyprtrack.db"
 backup="$HOME/.local/share/hyprtrack-backups/hyprtrack-$(date +%Y%m%d-%H%M%S).db"
@@ -182,9 +182,13 @@ The application database and preferences stay in place, and the independent
 collector keeps recording during an app-only update. Updating a running Python
 collector still requires restarting its existing command once to load new code.
 
-**What’s New** in the sidebar keeps the release history available offline.
+**What’s New** opens once after an update, with only releases newer than the
+last version opened on this device. It is not a permanent sidebar tab. Existing
+installations upgrading from versions without version tracking see only the
+current release’s notes for that migration. Fresh installations initialize the
+version quietly. Release notes work offline.
 DEB/RPM installations show the version and release notes but use their package
-manager for updates. Updating from 2.1.0 to 2.2.1 uses the existing manual update
+manager for updates. Updating from 2.1.0 to 2.2.2 uses the existing manual update
 instructions once; subsequent AppImage releases support the in-app updater.
 
 Release builds use `TAURI_SIGNING_PRIVATE_KEY` and the public key in
@@ -274,6 +278,13 @@ Starting the collector again continues screen-time tracking and shows network
 setup as required.
 
 ## Version History
+
+### v2.2.2 — Updates, without the clutter
+
+Keeps only HyprTrack in the sidebar brand. What’s New is a one-time post-update
+dialog showing changes since the last recorded version, including skipped
+updates, with no permanent sidebar tab. The top-bar update button appears only
+when a newer version is available; Settings keeps the version and manual check.
 
 ### v2.2.1 — Every byte has a place now
 

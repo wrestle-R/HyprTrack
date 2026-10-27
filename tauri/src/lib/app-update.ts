@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 
-export type AppInfo = { version: string; updateSupported: boolean }
+export type AppInfo = { version: string; updateSupported: boolean; hasExistingActivity?: boolean }
 export type UpdateProgress = {
   phase: "checking" | "downloading" | "installing" | "restarting" | "current"
   downloaded: number

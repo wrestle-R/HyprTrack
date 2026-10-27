@@ -5,7 +5,6 @@ import {
   GridViewIcon,
   Home01Icon,
   InternetIcon,
-  News01Icon,
   KeyboardIcon,
   MapsEditingIcon,
   Moon02Icon,
@@ -35,7 +34,8 @@ import { HyprTrackMark } from "./components/hyprtrack-mark"
 import { KeybindingsPage } from "./components/keybindings-page"
 import { MappingsPage } from "./components/mappings-page"
 import { DataflowPage } from "./components/dataflow-page"
-import { UpdateControl, WhatsNewPage } from "./components/app-updates"
+import { UpdateControl, ReleaseNoticeDialog } from "./components/app-updates"
+import { useReleaseNotice } from "./hooks/use-release-notice"
 import { useAppUpdate, type AppUpdateState } from "./hooks/use-app-update"
 import { useDesktopQuery } from "./hooks/use-desktop-query"
 import {
@@ -823,6 +823,7 @@ function SettingsPage({
 function App() {
   const { preferences, updatePreferences } = useDesktopPreferences()
   const update = useAppUpdate()
+  const releaseNotice = useReleaseNotice(update.infoLoaded ? update.info.version : null, update.info.hasExistingActivity ?? false)
   const [page, setPage] = React.useState<DesktopPage>("overview")
   const [rangeOverride, setRangeOverride] = React.useState<RangeKey | null>(null)
   const [refreshVersion, setRefreshVersion] = React.useState(0)
@@ -968,7 +969,7 @@ function App() {
 
   const pageTitle =
     PAGES.find((item) => item.id === page)?.label ??
-    (page === "keybindings" ? KEYBINDINGS_PAGE.label : page === "whats-new" ? "What’s New" : "HyprTrack")
+    (page === "keybindings" ? KEYBINDINGS_PAGE.label : "HyprTrack")
   const isDataPage = [
     "overview",
     "insights",
@@ -979,13 +980,13 @@ function App() {
 
   return (
     <div className="desktop-shell">
+      {releaseNotice.notice ? <ReleaseNoticeDialog notice={releaseNotice.notice} onDismiss={releaseNotice.dismiss} /> : null}
       <a className="skip-link" href="#main-content">Skip to content</a>
       <aside className="sidebar">
         <div className="brand-block">
           <HyprTrackMark className="brand-mark" title="HyprTrack" />
           <div>
             <strong>HyprTrack</strong>
-            <span className="brand-caption">Your day, in perspective.</span>
           </div>
         </div>
         <nav className="nav-stack" aria-label="Primary navigation">
@@ -1004,7 +1005,6 @@ function App() {
           ))}
         </nav>
         <nav className="nav-stack utility-nav" aria-label="Utility navigation">
-          <button className={`nav-item ${page === "whats-new" ? "active" : ""}`} type="button" onClick={() => setPage("whats-new")} aria-label="What’s New" aria-current={page === "whats-new" ? "page" : undefined}><HugeiconsIcon icon={News01Icon} strokeWidth={1.8} /><strong>What’s New</strong></button>
           <button
             className={`nav-item ${page === "keybindings" ? "active" : ""}`}
             type="button"
@@ -1112,7 +1112,6 @@ function App() {
               update={update}
             />
           ) : null}
-          {page === "whats-new" ? <WhatsNewPage version={update.info.version} /> : null}
           {page === "keybindings" ? (
             <KeybindingsPage
               bindings={preferences.keybindings}
