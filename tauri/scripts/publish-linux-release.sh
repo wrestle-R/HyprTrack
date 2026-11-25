@@ -27,14 +27,20 @@ for (const file of process.argv.slice(2)) {
 }
 JS
 node scripts/updater-manifest.mjs "$bundle/appimage" "$version" --check
-notes="$(mktemp)"
-trap 'rm -f "$notes"' EXIT
+release_dir="$(mktemp -d)"
+trap 'rm -rf -- "$release_dir"' EXIT
+notes="$release_dir/notes.md"
+archive="$release_dir/HyprTrack.Desktop_${version}_linux-x86_64.zip"
+python3 -m zipfile -c "$archive" "${assets[@]}"
+python3 -m zipfile -t "$archive"
+(cd "$release_dir" && sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256")
+assets+=("$archive" "$archive.sha256")
 RELEASE_NOTES="$notes" node --input-type=module <<'JS'
 import fs from 'node:fs'
 const version = process.env.RELEASE_TAG.slice(1)
 const entry = JSON.parse(fs.readFileSync('src/lib/releases.json', 'utf8')).find(r => r.version === version)
 if (!entry) throw Error('Missing release notes')
-fs.writeFileSync(process.env.RELEASE_NOTES, [entry.title, '', ...entry.highlights.map(s => `- ${s}`), '', 'Linux network capture needs the one-time NetHogs setup described in the README. Signed in-app updates are available for AppImage installations.', ''].join('\n'))
+fs.writeFileSync(process.env.RELEASE_NOTES, [entry.title, '', `Release date · ${entry.date}`, '', ...entry.highlights.map(s => `- ${s}`), '', 'Linux network capture needs the one-time NetHogs setup described in the README. Signed in-app updates are available for AppImage installations.', ''].join('\n'))
 JS
 
 if gh release view "$tag" --json isDraft >/dev/null 2>&1; then
@@ -54,5 +60,5 @@ for asset in "${assets[@]}"; do
   done
   [[ "$uploaded" == true ]] || exit 1
 done
-[[ "$(gh release view "$tag" --json assets --jq '.assets | length')" == 6 ]]
+[[ "$(gh release view "$tag" --json assets --jq '.assets | length')" == "${#assets[@]}" ]]
 gh release edit "$tag" --draft=false
