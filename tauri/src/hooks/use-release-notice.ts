@@ -11,6 +11,12 @@ function compare(a: string, b: string) {
   return 0
 }
 
+export function installedReleaseHistory(version: string): ReleaseNotice | null {
+  if (!/^\d+\.\d+\.\d+$/.test(version)) return null
+  const installed = releases.filter(release => compare(release.version, version) <= 0)
+  return installed.length ? { version, previousVersion: null, releases: installed } : null
+}
+
 export function consumeReleaseNotice(version: string, storage: Storage, hasExistingActivity = false): ReleaseNotice | null {
   if (!/^\d+\.\d+\.\d+$/.test(version)) return null
   try {

@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.2.3",
+    "date": "2026-11-25",
+    "title": "Safer network capture and release history",
+    "highlights": [
+      "The network helper checks permissions before setting capture capabilities, and the collector uses the trusted helper path.",
+      "Choose Release history in Settings to see what changed in each installed version.",
+      "Download the Linux packages, signatures and checksums together as a ZIP."
+    ]
+  },
+  {
     "version": "2.2.2",
     "date": "2026-10-27",
     "title": "Updates, without the clutter",
